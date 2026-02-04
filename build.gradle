@@ -5,7 +5,7 @@ plugins {
     id 'checkstyle'
     id 'jacoco'
     id 'org.sonarqube' version '7.2.2.6593'
-
+    id 'com.google.protobuf' version '0.9.4'
 }
 
 group = 'com.shortener'
@@ -36,9 +36,51 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // TSID
+    implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
+
+    // gRPC - 버전 통일 (3.1.0.RELEASE가 사용하는 1.63.0으로)
+    implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+
+    // Java 9+ 호환성
+    implementation 'javax.annotation:javax.annotation-api:1.3.2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // test container
+    testImplementation 'org.testcontainers:testcontainers:1.19.4'
+    testImplementation 'org.testcontainers:junit-jupiter:1.19.4'
+    testImplementation 'org.testcontainers:mysql:1.19.4'
+}
+
+// Protobuf 플러그인 설정
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.1"
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.63.0'
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+        }
+    }
+}
+
+// 생성된 코드 경로
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/source/proto/main/grpc'
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
 }
 
 checkstyle {

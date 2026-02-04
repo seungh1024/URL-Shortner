@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.shortener.url_shortener.domain.url";
+option java_outer_classname = "UrlShortenerProto";
+
+package url;
+
+service UrlShortenerRpc {
+  rpc CreateLink(CreateLinkRequest) returns (CreateLinkResponse);
+  rpc DeleteLink(DeleteLinkRequest) returns (DeleteLinkResponse);
+}
+
+message CreateLinkRequest {
+  string redirect_url = 1;
+}
+
+message CreateLinkResponse {
+  string hash_key = 1;
+  string short_url = 2;
+}
+
+message DeleteLinkRequest {
+  string hash_key = 1;
+}
+
+message DeleteLinkResponse {
+  // 빈 응답 (성공/실패는 gRPC Status로)
+}

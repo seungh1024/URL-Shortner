@@ -1,4 +1,4 @@
-package com.shortener.url_shortener.domain.url.service;
+package com.shortener.url_shortener.global.util;
 
 import org.springframework.stereotype.Service;
 

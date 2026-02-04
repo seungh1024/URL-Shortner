@@ -27,11 +27,11 @@ public class URLShortenerController {
 
 	private final URLShortenerService urlShortenerService;
 
-	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	public LinkCreateResponse createLink(@RequestBody LinkRequest dto) {
-		return urlShortenerService.createLink(dto.redirectURL());
-	}
+	// @PostMapping
+	// @ResponseStatus(HttpStatus.CREATED)
+	// public LinkCreateResponse createLink(@RequestBody LinkRequest dto) {
+	// 	return urlShortenerService.createLink(dto.redirectURL());
+	// }
 
 	@GetMapping("/{key}")
 	public ResponseEntity<Void> getLink(@PathVariable String key) {
@@ -42,9 +42,9 @@ public class URLShortenerController {
 		return new ResponseEntity<>(headers, HttpStatus.FOUND);
 	}
 
-	@DeleteMapping("/{key}")
-	@ResponseStatus(HttpStatus.ACCEPTED)
-	public void deleteLink(@PathVariable String key) {
-		urlShortenerService.deleteLink(key);
-	}
+	// @DeleteMapping("/{key}")
+	// @ResponseStatus(HttpStatus.ACCEPTED)
+	// public void deleteLink(@PathVariable String key) {
+	// 	urlShortenerService.deleteLink(key);
+	// }
 }
