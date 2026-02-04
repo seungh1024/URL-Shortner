@@ -18,7 +18,7 @@ public enum ErrorCode {
 	EXPIRED_LINK(HttpStatus.NOT_FOUND, "링크가 만료되었습니다."),
 	// 500,
 	URL_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "URL 생성에 실패했습니다."),
-	;
+	REQUEST_CANCELLED(HttpStatus.INTERNAL_SERVER_ERROR, "사용자와 연결이 끊겼습니다.");
 
 	private final HttpStatus status;
 	private final String message;

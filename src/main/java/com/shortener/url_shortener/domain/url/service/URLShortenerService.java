@@ -8,7 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.shortener.url_shortener.domain.url.dto.LinkCreateResponse;
+import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.URLShortener;
 import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
 import com.shortener.url_shortener.domain.url.util.Base62Encoder;
@@ -16,8 +16,11 @@ import com.shortener.url_shortener.domain.url.util.HashGenerator;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.ShortenerStringUtil;
 
+import io.grpc.Context;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class URLShortenerService {
@@ -65,6 +68,13 @@ public class URLShortenerService {
 		int offset = encodedHash.length();
 		long triedOffset = 0;
 		for (int i = 0; i < retry; i++) {
+			// DB 저장 전 취소 확인(timeout 등)
+			if (Context.current().isCancelled()) {
+				log.warn("Request cancelled, stopping processing");
+				throw ErrorCode.REQUEST_CANCELLED.baseException(
+					"Request was cancelled by client"
+				);
+			}
 			do {
 				triedOffset |= (1L << offset);
 				offset = new SecureRandom().nextInt(encodedHash.length() - hashKeySize);

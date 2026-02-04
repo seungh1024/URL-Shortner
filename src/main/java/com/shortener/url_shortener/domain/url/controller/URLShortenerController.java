@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.shortener.url_shortener.domain.url.dto.LinkCreateResponse;
-import com.shortener.url_shortener.domain.url.dto.request.LinkRequestDto;
+import com.shortener.url_shortener.domain.url.dto.request.LinkRequest;
+import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
 import com.shortener.url_shortener.domain.url.service.URLShortenerService;
 
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ public class URLShortenerController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public LinkCreateResponse createLink(@RequestBody LinkRequestDto dto) {
+	public LinkCreateResponse createLink(@RequestBody LinkRequest dto) {
 		return urlShortenerService.createLink(dto.redirectURL());
 	}
 
