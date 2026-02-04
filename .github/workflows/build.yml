@@ -40,7 +40,17 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Create application-secret.yml
+        run: |
+          mkdir -p src/main/resources
+          echo "${{ secrets.APPLICATION_SECRET_YML_B64 }}" | base64 -d > src/main/resources/application-secret.yml
+
+      - name: Test
+        if: github.event_name == 'pull_request'
+        run: ./gradlew test
+
       - name: Test + JaCoCo + Sonar analyze
+        if: github.event_name == 'push'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
