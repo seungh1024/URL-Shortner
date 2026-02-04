@@ -11,8 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.URLShortener;
 import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
-import com.shortener.url_shortener.domain.url.util.Base62Encoder;
-import com.shortener.url_shortener.domain.url.util.HashGenerator;
+import com.shortener.url_shortener.global.util.Base62Encoder;
+import com.shortener.url_shortener.global.util.HashGenerator;
+import com.shortener.url_shortener.global.util.TsidGenerator;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.ShortenerStringUtil;
 
@@ -30,8 +31,8 @@ public class URLShortenerService {
 	private final Base62Encoder base62Encoder;
 	private final HashGenerator hashGenerator;
 
-	@Value("${server.domain}")
-	private String domain;
+	@Value("${server.redirection.domain}")
+	private String redirectionBaseDomain;
 
 	@Value("${constant.default-expiration-days}")
 	private int defaultExpirationDays;
@@ -111,8 +112,8 @@ public class URLShortenerService {
 	}
 
 	private String toShortUrl(String key) {
-		StringBuilder sb = new StringBuilder(domain);
-		if (!domain.endsWith("/")) {
+		StringBuilder sb = new StringBuilder(redirectionBaseDomain);
+		if (!redirectionBaseDomain.endsWith("/")) {
 			sb.append("/");
 		}
 		sb.append(key);
