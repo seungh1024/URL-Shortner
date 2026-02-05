@@ -270,10 +270,7 @@ class UrlShortenerGrpcControllerTest {
 				.build();
 
 			// BAD_REQUEST → INVALID_ARGUMENT
-			CustomException badRequest = new CustomException(
-				HttpStatus.BAD_REQUEST,
-				"Bad request"
-			);
+			CustomException badRequest = ErrorCode.INVALID_ARGUMENT_ERROR.baseException();
 			when(urlShortenerService.createLink(redirectUrl)).thenThrow(badRequest);
 
 			// when

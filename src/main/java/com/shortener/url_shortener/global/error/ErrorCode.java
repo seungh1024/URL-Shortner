@@ -25,10 +25,10 @@ public enum ErrorCode {
 	private final String message;
 
 	public CustomException baseException() {
-		return new CustomException(status, message);
+		return new CustomException(this);
 	}
 
 	public CustomException baseException(String debugMessage, Object... args) {
-		return new CustomException(status, message, String.format(debugMessage, args));
+		return new CustomException(this, String.format(debugMessage, args));
 	}
 }

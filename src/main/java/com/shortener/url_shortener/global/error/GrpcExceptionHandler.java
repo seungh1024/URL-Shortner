@@ -43,26 +43,26 @@ public class GrpcExceptionHandler {
 	 * CustomException을 gRPC Status로 매핑
 	 *
 	 * 매핑 전략:
-	 * 1. HttpStatus 기반 매핑 (기본)
-	 * 2. 메시지 패턴 인식 (특수 케이스)
+	 * 1. ErrorCode 기반 매핑 (특수 케이스)
+	 * 2. HttpStatus 기반 매핑 (일반 케이스)
 	 */
 	private Status mapCustomException(CustomException e) {
-		HttpStatus httpStatus = e.getHttpStatus();
+		ErrorCode errorCode = e.getErrorCode();
 		String message = e.getMessage();
 
-		// 특수 케이스: URL 생성 실패 (재시도 가능)
-		if (message != null && message.contains("URL 생성")) {
+		// ErrorCode 기반 매핑 (특수 케이스)
+		if (errorCode == ErrorCode.URL_GENERATION_FAILED) {
 			return Status.RESOURCE_EXHAUSTED
 				.withDescription(message);
 		}
 
-		// 특수 케이스: 요청 취소
-		if (message != null && message.contains("cancelled")) {
+		if (errorCode == ErrorCode.REQUEST_CANCELLED) {
 			return Status.CANCELLED
 				.withDescription(message);
 		}
 
-		// HttpStatus 기반 매핑
+		// HttpStatus 기반 매핑 (일반 케이스)
+		HttpStatus httpStatus = e.getHttpStatus();
 		return switch (httpStatus) {
 			case BAD_REQUEST -> Status.INVALID_ARGUMENT.withDescription(message);
 

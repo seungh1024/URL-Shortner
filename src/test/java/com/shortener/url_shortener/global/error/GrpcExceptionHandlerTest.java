@@ -5,7 +5,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * 
  * 테스트 내용:
  * - CustomException → gRPC Status 변환
- * - HttpStatus별 매핑 검증
+ * - ErrorCode별 매핑 검증
  * - 예상치 못한 에러 처리
  */
 @DisplayName("GrpcExceptionHandler 단위 테스트")
@@ -33,156 +32,115 @@ class GrpcExceptionHandlerTest {
 	class ConvertCustomExceptionTest {
 
 		@Test
-		@DisplayName("BAD_REQUEST → INVALID_ARGUMENT 변환")
-		void badRequest_to_invalidArgument() {
+		@DisplayName("INVALID_KEY_ERROR → INVALID_ARGUMENT 변환")
+		void invalidKey_to_invalidArgument() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.BAD_REQUEST,
-				"Invalid parameter"
-			);
+			CustomException exception = ErrorCode.INVALID_KEY_ERROR.baseException("Invalid parameter");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
 			assertEquals(Status.Code.INVALID_ARGUMENT, status.getCode());
-			assertEquals("Invalid parameter", status.getDescription());
+			assertEquals(ErrorCode.INVALID_KEY_ERROR.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("NOT_FOUND → NOT_FOUND 변환")
-		void notFound_to_notFound() {
+		@DisplayName("KEY_NOT_FOUND → NOT_FOUND 변환")
+		void keyNotFound_to_notFound() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.NOT_FOUND,
-				"Key not found"
-			);
+			CustomException exception = ErrorCode.KEY_NOT_FOUND.baseException("Key not found");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
 			assertEquals(Status.Code.NOT_FOUND, status.getCode());
-			assertEquals("Key not found", status.getDescription());
+			assertEquals(ErrorCode.KEY_NOT_FOUND.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("INTERNAL_SERVER_ERROR → INTERNAL 변환")
-		void internalError_to_internal() {
+		@DisplayName("EXPIRED_LINK → NOT_FOUND 변환")
+		void expiredLink_to_notFound() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.INTERNAL_SERVER_ERROR,
-				"Internal error"
-			);
+			CustomException exception = ErrorCode.EXPIRED_LINK.baseException("Link expired");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
-			assertEquals(Status.Code.INTERNAL, status.getCode());
-			assertEquals("Internal error", status.getDescription());
+			assertEquals(Status.Code.NOT_FOUND, status.getCode());
+			assertEquals(ErrorCode.EXPIRED_LINK.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("URL 생성 실패 메시지 → RESOURCE_EXHAUSTED 변환")
+		@DisplayName("URL_GENERATION_FAILED → RESOURCE_EXHAUSTED 변환 (ErrorCode 기반)")
 		void urlGenerationFailed_to_resourceExhausted() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.INTERNAL_SERVER_ERROR,
-				"URL 생성에 실패했습니다."
-			);
+			CustomException exception = ErrorCode.URL_GENERATION_FAILED.baseException("Hash collision");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
 			assertEquals(Status.Code.RESOURCE_EXHAUSTED, status.getCode());
-			assertEquals("URL 생성에 실패했습니다.", status.getDescription());
+			assertEquals(ErrorCode.URL_GENERATION_FAILED.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("요청 취소 메시지 → CANCELLED 변환")
+		@DisplayName("REQUEST_CANCELLED → CANCELLED 변환 (ErrorCode 기반)")
 		void requestCancelled_to_cancelled() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.INTERNAL_SERVER_ERROR,
-				"Request was cancelled by client"
-			);
+			CustomException exception = ErrorCode.REQUEST_CANCELLED.baseException("Client cancelled");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
 			assertEquals(Status.Code.CANCELLED, status.getCode());
-			assertEquals("Request was cancelled by client", status.getDescription());
+			assertEquals(ErrorCode.REQUEST_CANCELLED.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("CONFLICT → ALREADY_EXISTS 변환")
-		void conflict_to_alreadyExists() {
+		@DisplayName("HASHING_FAILED → INTERNAL 변환")
+		void hashingFailed_to_internal() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.CONFLICT,
-				"Resource already exists"
-			);
+			CustomException exception = ErrorCode.HASHING_FAILED.baseException("SHA-256 failed");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
-			assertEquals(Status.Code.ALREADY_EXISTS, status.getCode());
-			assertEquals("Resource already exists", status.getDescription());
+			assertEquals(Status.Code.INTERNAL, status.getCode());
+			assertEquals(ErrorCode.HASHING_FAILED.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("UNAUTHORIZED → PERMISSION_DENIED 변환")
-		void unauthorized_to_permissionDenied() {
+		@DisplayName("INVALID_ARGUMENT_ERROR → INVALID_ARGUMENT 변환")
+		void invalidArgument_to_invalidArgument() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.UNAUTHORIZED,
-				"Unauthorized access"
-			);
+			CustomException exception = ErrorCode.INVALID_ARGUMENT_ERROR.baseException("Bad request");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
-			assertEquals(Status.Code.PERMISSION_DENIED, status.getCode());
-			assertEquals("Unauthorized access", status.getDescription());
+			assertEquals(Status.Code.INVALID_ARGUMENT, status.getCode());
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), status.getDescription());
 		}
 
 		@Test
-		@DisplayName("TOO_MANY_REQUESTS → RESOURCE_EXHAUSTED 변환")
-		void tooManyRequests_to_resourceExhausted() {
+		@DisplayName("MISSING_REQUIRED_PARAMETER → INVALID_ARGUMENT 변환")
+		void missingParameter_to_invalidArgument() {
 			// given
-			CustomException exception = new CustomException(
-				HttpStatus.TOO_MANY_REQUESTS,
-				"Rate limit exceeded"
-			);
+			CustomException exception = ErrorCode.MISSING_REQUIRED_PARAMETER.baseException("Missing param");
 
 			// when
 			Status status = handler.convertToStatus(exception);
 
 			// then
-			assertEquals(Status.Code.RESOURCE_EXHAUSTED, status.getCode());
-			assertEquals("Rate limit exceeded", status.getDescription());
-		}
-
-		@Test
-		@DisplayName("SERVICE_UNAVAILABLE → UNAVAILABLE 변환")
-		void serviceUnavailable_to_unavailable() {
-			// given
-			CustomException exception = new CustomException(
-				HttpStatus.SERVICE_UNAVAILABLE,
-				"Service temporarily unavailable"
-			);
-
-			// when
-			Status status = handler.convertToStatus(exception);
-
-			// then
-			assertEquals(Status.Code.UNAVAILABLE, status.getCode());
-			assertEquals("Service temporarily unavailable", status.getDescription());
+			assertEquals(Status.Code.INVALID_ARGUMENT, status.getCode());
+			assertEquals(ErrorCode.MISSING_REQUIRED_PARAMETER.getMessage(), status.getDescription());
 		}
 	}
 
@@ -231,6 +189,41 @@ class GrpcExceptionHandlerTest {
 			// then
 			assertEquals(Status.Code.INTERNAL, status.getCode());
 			assertEquals("Internal server error", status.getDescription());
+		}
+	}
+
+	@Nested
+	@DisplayName("ErrorCode 특수 케이스 우선순위 테스트")
+	class ErrorCodePriorityTest {
+
+		@Test
+		@DisplayName("URL_GENERATION_FAILED는 HttpStatus가 INTERNAL이지만 RESOURCE_EXHAUSTED로 매핑")
+		void urlGenerationFailed_overridesHttpStatus() {
+			// given
+			CustomException exception = ErrorCode.URL_GENERATION_FAILED.baseException();
+
+			// when
+			Status status = handler.convertToStatus(exception);
+
+			// then
+			// HttpStatus.INTERNAL_SERVER_ERROR → Status.INTERNAL이 아니라
+			// ErrorCode 기반으로 Status.RESOURCE_EXHAUSTED로 변환되어야 함
+			assertEquals(Status.Code.RESOURCE_EXHAUSTED, status.getCode());
+		}
+
+		@Test
+		@DisplayName("REQUEST_CANCELLED는 HttpStatus가 INTERNAL이지만 CANCELLED로 매핑")
+		void requestCancelled_overridesHttpStatus() {
+			// given
+			CustomException exception = ErrorCode.REQUEST_CANCELLED.baseException();
+
+			// when
+			Status status = handler.convertToStatus(exception);
+
+			// then
+			// HttpStatus.INTERNAL_SERVER_ERROR → Status.INTERNAL이 아니라
+			// ErrorCode 기반으로 Status.CANCELLED로 변환되어야 함
+			assertEquals(Status.Code.CANCELLED, status.getCode());
 		}
 	}
 }
