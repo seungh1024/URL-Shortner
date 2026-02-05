@@ -80,7 +80,7 @@ public class ShortUrlService {
 				);
 			}
 			do {
-				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize);
+				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize + 1);
 			} while (isOffsetAlreadyTried(triedOffset, offset));  // 명확한 의미
 			triedOffset |= (1L << offset);
 
