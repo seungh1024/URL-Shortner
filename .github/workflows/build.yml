@@ -46,7 +46,6 @@ jobs:
           printf '%s' "${{ secrets.APPLICATION_SECRET_YML_B64 }}" | base64 -d > src/main/resources/application-secret.yml
 
       - name: Test + JaCoCo + Sonar analyze
-        if: github.event_name == 'push'
         env:
           SPRING_PROFILES_ACTIVE: test,secret
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
