@@ -43,6 +43,8 @@ public class URLShortenerService {
 	@Value("${constant.hash.conflict.retry}")
 	private int retry;
 
+	private static final SecureRandom secureRandom = new SecureRandom();
+
 	@Transactional
 	public String getLink(String key) {
 		validateHashKey(key);
@@ -68,7 +70,7 @@ public class URLShortenerService {
 
 		int offset = encodedHash.length();
 		long triedOffset = 0;
-		SecureRandom secureRandom = new SecureRandom();
+
 		for (int i = 0; i < retry; i++) {
 			// DB 저장 전 취소 확인(timeout 등)
 			if (Context.current().isCancelled()) {
