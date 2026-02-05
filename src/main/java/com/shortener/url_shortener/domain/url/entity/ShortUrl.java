@@ -20,18 +20,18 @@ import lombok.NoArgsConstructor;
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class URLShortener {
+public class ShortUrl {
 	@Id
 	private Long id;
 
 	@Column(name = "hash_key", nullable = false, length = 8, unique = true)
-	String hashKey;
+	private String hashKey;
 
 	@Column(name = "redirection_url", nullable = false, columnDefinition = "TEXT")
-	String redirectionUrl;
+	private String redirectionUrl;
 
 	@Column(name = "expired_at",nullable = false)
-	LocalDateTime expiredAt;
+	private LocalDateTime expiredAt;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
@@ -51,7 +51,7 @@ public class URLShortener {
 		this.updatedAt = LocalDateTime.now();
 	}
 
-	public URLShortener(Long id, String hashKey, String redirectionUrl, LocalDateTime expiredAt) {
+	public ShortUrl(Long id, String hashKey, String redirectionUrl, LocalDateTime expiredAt) {
 		this.id = id;
 		this.hashKey = hashKey;
 		this.redirectionUrl = redirectionUrl;

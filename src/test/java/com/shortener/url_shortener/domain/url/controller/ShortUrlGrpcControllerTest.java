@@ -5,7 +5,7 @@ import com.shortener.url_shortener.domain.url.CreateLinkResponse;
 import com.shortener.url_shortener.domain.url.DeleteLinkRequest;
 import com.shortener.url_shortener.domain.url.DeleteLinkResponse;
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
-import com.shortener.url_shortener.domain.url.service.URLShortenerService;
+import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.CustomException;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.error.GrpcExceptionHandler;
@@ -21,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,12 +36,12 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UrlShortenerGrpcController 단위 테스트")
-class UrlShortenerGrpcControllerTest {
+class ShortUrlGrpcControllerTest {
 
-	private UrlShortenerGrpcController controller;
+	private ShortUrlGrpcController controller;
 
 	@Mock
-	private URLShortenerService urlShortenerService;
+	private ShortUrlService shortUrlService;
 
 	private GrpcExceptionHandler exceptionHandler;
 
@@ -64,7 +63,7 @@ class UrlShortenerGrpcControllerTest {
 	@BeforeEach
 	void setUp() {
 		exceptionHandler = new GrpcExceptionHandler();
-		controller = new UrlShortenerGrpcController(urlShortenerService, exceptionHandler);
+		controller = new ShortUrlGrpcController(shortUrlService, exceptionHandler);
 	}
 
 	@Nested
@@ -84,13 +83,13 @@ class UrlShortenerGrpcControllerTest {
 				.build();
 
 			LinkCreateResponse serviceResponse = new LinkCreateResponse(hashKey, shortUrl);
-			when(urlShortenerService.createLink(redirectUrl)).thenReturn(serviceResponse);
+			when(shortUrlService.createLink(redirectUrl)).thenReturn(serviceResponse);
 
 			// when
 			controller.createLink(request, createLinkObserver);
 
 			// then
-			verify(urlShortenerService, times(1)).createLink(redirectUrl);
+			verify(shortUrlService, times(1)).createLink(redirectUrl);
 			verify(createLinkObserver, times(1)).onNext(createLinkResponseCaptor.capture());
 			verify(createLinkObserver, times(1)).onCompleted();
 			verify(createLinkObserver, never()).onError(any());
@@ -112,13 +111,13 @@ class UrlShortenerGrpcControllerTest {
 			CustomException exception = ErrorCode.URL_GENERATION_FAILED.baseException(
 				"Hash collision occurred"
 			);
-			when(urlShortenerService.createLink(redirectUrl)).thenThrow(exception);
+			when(shortUrlService.createLink(redirectUrl)).thenThrow(exception);
 
 			// when
 			controller.createLink(request, createLinkObserver);
 
 			// then
-			verify(urlShortenerService, times(1)).createLink(redirectUrl);
+			verify(shortUrlService, times(1)).createLink(redirectUrl);
 			verify(createLinkObserver, never()).onNext(any());
 			verify(createLinkObserver, never()).onCompleted();
 			verify(createLinkObserver, times(1)).onError(exceptionCaptor.capture());
@@ -140,7 +139,7 @@ class UrlShortenerGrpcControllerTest {
 			CustomException exception = ErrorCode.REQUEST_CANCELLED.baseException(
 				"Request was cancelled by client"
 			);
-			when(urlShortenerService.createLink(redirectUrl)).thenThrow(exception);
+			when(shortUrlService.createLink(redirectUrl)).thenThrow(exception);
 
 			// when
 			controller.createLink(request, createLinkObserver);
@@ -163,7 +162,7 @@ class UrlShortenerGrpcControllerTest {
 				.build();
 
 			RuntimeException exception = new RuntimeException("Unexpected error");
-			when(urlShortenerService.createLink(redirectUrl)).thenThrow(exception);
+			when(shortUrlService.createLink(redirectUrl)).thenThrow(exception);
 
 			// when
 			controller.createLink(request, createLinkObserver);
@@ -189,13 +188,13 @@ class UrlShortenerGrpcControllerTest {
 				.setHashKey(hashKey)
 				.build();
 
-			doNothing().when(urlShortenerService).deleteLink(hashKey);
+			doNothing().when(shortUrlService).deleteLink(hashKey);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);
 
 			// then
-			verify(urlShortenerService, times(1)).deleteLink(hashKey);
+			verify(shortUrlService, times(1)).deleteLink(hashKey);
 			verify(deleteLinkObserver, times(1)).onNext(deleteLinkResponseCaptor.capture());
 			verify(deleteLinkObserver, times(1)).onCompleted();
 			verify(deleteLinkObserver, never()).onError(any());
@@ -216,13 +215,13 @@ class UrlShortenerGrpcControllerTest {
 			CustomException exception = ErrorCode.KEY_NOT_FOUND.baseException(
 				"Key not found"
 			);
-			doThrow(exception).when(urlShortenerService).deleteLink(hashKey);
+			doThrow(exception).when(shortUrlService).deleteLink(hashKey);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);
 
 			// then
-			verify(urlShortenerService, times(1)).deleteLink(hashKey);
+			verify(shortUrlService, times(1)).deleteLink(hashKey);
 			verify(deleteLinkObserver, never()).onNext(any());
 			verify(deleteLinkObserver, never()).onCompleted();
 			verify(deleteLinkObserver, times(1)).onError(exceptionCaptor.capture());
@@ -243,7 +242,7 @@ class UrlShortenerGrpcControllerTest {
 			CustomException exception = ErrorCode.INVALID_KEY_ERROR.baseException(
 				"Invalid key format"
 			);
-			doThrow(exception).when(urlShortenerService).deleteLink(hashKey);
+			doThrow(exception).when(shortUrlService).deleteLink(hashKey);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);
@@ -271,7 +270,7 @@ class UrlShortenerGrpcControllerTest {
 
 			// BAD_REQUEST → INVALID_ARGUMENT
 			CustomException badRequest = ErrorCode.INVALID_ARGUMENT_ERROR.baseException();
-			when(urlShortenerService.createLink(redirectUrl)).thenThrow(badRequest);
+			when(shortUrlService.createLink(redirectUrl)).thenThrow(badRequest);
 
 			// when
 			controller.createLink(request, createLinkObserver);

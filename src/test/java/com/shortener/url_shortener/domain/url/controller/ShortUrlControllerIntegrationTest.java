@@ -12,8 +12,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.shortener.url_shortener.container.IntegrationTestBase;
-import com.shortener.url_shortener.domain.url.entity.URLShortener;
-import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
+import com.shortener.url_shortener.domain.url.entity.ShortUrl;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * - 만료된 링크 처리
  */
 @DisplayName("URLShortenerController 통합 테스트")
-class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
+class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 
 	private MockMvc mockMvc;
 
@@ -35,7 +35,7 @@ class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
 	private WebApplicationContext webApplicationContext;
 
 	@Autowired
-	private URLShortenerJpaRepository urlShortenerJpaRepository;
+	private ShortUrlJpaRepository shortUrlJpaRepository;
 
 	@BeforeEach
 	void setUpMockMvc() {
@@ -52,8 +52,8 @@ class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "testKey1";
 			String redirectUrl = "https://example.com/test";
-			URLShortener entity = new URLShortener(123456789L, hashKey, redirectUrl, LocalDateTime.now().plusDays(7));
-			urlShortenerJpaRepository.save(entity);
+			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl, LocalDateTime.now().plusDays(7));
+			shortUrlJpaRepository.save(entity);
 
 			// when & then
 			mockMvc.perform(get("/link/{key}", hashKey))
@@ -79,10 +79,10 @@ class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "expired1";
 			String redirectUrl = "https://example.com/expired";
-			URLShortener entity = new URLShortener(123456789L, hashKey, redirectUrl,
+			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl,
 				LocalDateTime.now().minusDays(1) // 이미 만료됨
 			);
-			urlShortenerJpaRepository.save(entity);
+			shortUrlJpaRepository.save(entity);
 
 			// when & then
 			mockMvc.perform(get("/link/{key}", hashKey))
@@ -96,10 +96,10 @@ class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "almostEx";
 			String redirectUrl = "https://example.com/almost-expired";
-			URLShortener entity = new URLShortener(123456789L, hashKey, redirectUrl,
+			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl,
 				LocalDateTime.now().plusMinutes(1) // 1분 남음
 			);
-			urlShortenerJpaRepository.save(entity);
+			shortUrlJpaRepository.save(entity);
 
 			// when & then
 			mockMvc.perform(get("/link/{key}", hashKey))
@@ -127,9 +127,9 @@ class URLShortenerControllerIntegrationTest extends IntegrationTestBase {
 
 			for (String key : keys) {
 				String redirectUrl = "https://example.com/" + key;
-				URLShortener entity = new URLShortener(System.currentTimeMillis(), key, redirectUrl,
+				ShortUrl entity = new ShortUrl(System.currentTimeMillis(), key, redirectUrl,
 					LocalDateTime.now().plusDays(7));
-				urlShortenerJpaRepository.save(entity);
+				shortUrlJpaRepository.save(entity);
 
 				// when & then
 				mockMvc.perform(get("/link/{key}", key))

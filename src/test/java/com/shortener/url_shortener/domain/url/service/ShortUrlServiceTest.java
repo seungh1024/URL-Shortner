@@ -1,8 +1,8 @@
 package com.shortener.url_shortener.domain.url.service;
 
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
-import com.shortener.url_shortener.domain.url.entity.URLShortener;
-import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
+import com.shortener.url_shortener.domain.url.entity.ShortUrl;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
 import com.shortener.url_shortener.global.error.CustomException;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.Base62Encoder;
@@ -38,13 +38,13 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("URLShortenerService 단위 테스트")
-class URLShortenerServiceTest {
+class ShortUrlServiceTest {
 
 	@Mock
 	private TsidGenerator tsidGenerator;
 
 	@Mock
-	private URLShortenerJpaRepository urlShortenerJpaRepository;
+	private ShortUrlJpaRepository shortUrlJpaRepository;
 
 	@Mock
 	private Base62Encoder base62Encoder;
@@ -53,14 +53,14 @@ class URLShortenerServiceTest {
 	private HashGenerator hashGenerator;
 
 	@InjectMocks
-	private URLShortenerService urlShortenerService;
+	private ShortUrlService shortUrlService;
 
 	@BeforeEach
 	void setUp() {
-		ReflectionTestUtils.setField(urlShortenerService, "redirectionBaseDomain", "http://localhost:8080");
-		ReflectionTestUtils.setField(urlShortenerService, "defaultExpirationDays", 7);
-		ReflectionTestUtils.setField(urlShortenerService, "hashKeySize", 8);
-		ReflectionTestUtils.setField(urlShortenerService, "retry", 3);
+		ReflectionTestUtils.setField(shortUrlService, "redirectionBaseDomain", "http://localhost:8080");
+		ReflectionTestUtils.setField(shortUrlService, "defaultExpirationDays", 7);
+		ReflectionTestUtils.setField(shortUrlService, "hashKeySize", 8);
+		ReflectionTestUtils.setField(shortUrlService, "retry", 3);
 	}
 
 	@Nested
@@ -79,17 +79,17 @@ class URLShortenerServiceTest {
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
-			when(urlShortenerJpaRepository.save(any(URLShortener.class))).thenAnswer(i -> i.getArgument(0));
+			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertNotNull(response);
 			assertEquals(8, response.hashKey().length());
 			assertTrue(response.url().contains(response.hashKey()));
 			verify(tsidGenerator, times(1)).nextKey();
-			verify(urlShortenerJpaRepository, times(1)).save(any(URLShortener.class));
+			verify(shortUrlJpaRepository, times(1)).save(any(ShortUrl.class));
 		}
 
 		@Test
@@ -106,16 +106,16 @@ class URLShortenerServiceTest {
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
 
 			// 첫 번째 시도: 충돌
-			when(urlShortenerJpaRepository.save(any(URLShortener.class)))
+			when(shortUrlJpaRepository.save(any(ShortUrl.class)))
 				.thenThrow(new DataIntegrityViolationException("Duplicate key"))
 				.thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertNotNull(response);
-			verify(urlShortenerJpaRepository, times(2)).save(any(URLShortener.class));
+			verify(shortUrlJpaRepository, times(2)).save(any(ShortUrl.class));
 		}
 
 		@Test
@@ -132,15 +132,15 @@ class URLShortenerServiceTest {
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
 
 			// 모든 시도 충돌
-			when(urlShortenerJpaRepository.save(any(URLShortener.class)))
+			when(shortUrlJpaRepository.save(any(ShortUrl.class)))
 				.thenThrow(new DataIntegrityViolationException("Duplicate key"));
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> urlShortenerService.createLink(redirectUrl));
+				() -> shortUrlService.createLink(redirectUrl));
 
 			assertEquals(ErrorCode.URL_GENERATION_FAILED.getMessage(), exception.getMessage());
-			verify(urlShortenerJpaRepository, times(3)).save(any(URLShortener.class));
+			verify(shortUrlJpaRepository, times(3)).save(any(ShortUrl.class));
 		}
 
 		@Test
@@ -161,10 +161,10 @@ class URLShortenerServiceTest {
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> ctx.call(() -> urlShortenerService.createLink(redirectUrl)));
+				() -> ctx.call(() -> shortUrlService.createLink(redirectUrl)));
 
 			assertEquals(ErrorCode.REQUEST_CANCELLED.getMessage(), exception.getMessage());
-			verify(urlShortenerJpaRepository, never()).save(any(URLShortener.class));
+			verify(shortUrlJpaRepository, never()).save(any(ShortUrl.class));
 		}
 
 		@Test
@@ -179,10 +179,10 @@ class URLShortenerServiceTest {
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
-			when(urlShortenerJpaRepository.save(any(URLShortener.class))).thenAnswer(i -> i.getArgument(0));
+			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertEquals(8, response.hashKey().length());
@@ -200,7 +200,7 @@ class URLShortenerServiceTest {
 			// given
 			String hashKey = "aB3Xy9Km";
 			String redirectUrl = "https://example.com";
-			URLShortener urlShortener = new URLShortener(
+			ShortUrl shortUrl = new ShortUrl(
 				123456789L,
 				hashKey,
 				redirectUrl,
@@ -208,14 +208,14 @@ class URLShortenerServiceTest {
 			);
 
 			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(urlShortenerJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(urlShortener));
+			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(shortUrl));
 
 			// when
-			String result = urlShortenerService.getLink(hashKey);
+			String result = shortUrlService.getLink(hashKey);
 
 			// then
 			assertEquals(redirectUrl, result);
-			verify(urlShortenerJpaRepository, times(1)).findByHashKey(hashKey);
+			verify(shortUrlJpaRepository, times(1)).findByHashKey(hashKey);
 		}
 
 		@Test
@@ -225,11 +225,11 @@ class URLShortenerServiceTest {
 			String hashKey = "notExist";
 
 			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(urlShortenerJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.empty());
+			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.empty());
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> urlShortenerService.getLink(hashKey));
+				() -> shortUrlService.getLink(hashKey));
 
 			assertEquals(ErrorCode.KEY_NOT_FOUND.getMessage(), exception.getMessage());
 		}
@@ -240,7 +240,7 @@ class URLShortenerServiceTest {
 			// given
 			String hashKey = "expired1";
 			String redirectUrl = "https://example.com";
-			URLShortener urlShortener = new URLShortener(
+			ShortUrl shortUrl = new ShortUrl(
 				123456789L,
 				hashKey,
 				redirectUrl,
@@ -248,11 +248,11 @@ class URLShortenerServiceTest {
 			);
 
 			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(urlShortenerJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(urlShortener));
+			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(shortUrl));
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> urlShortenerService.getLink(hashKey));
+				() -> shortUrlService.getLink(hashKey));
 
 			assertEquals(ErrorCode.EXPIRED_LINK.getMessage(), exception.getMessage());
 		}
@@ -267,10 +267,10 @@ class URLShortenerServiceTest {
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> urlShortenerService.getLink(hashKey));
+				() -> shortUrlService.getLink(hashKey));
 
 			assertEquals(ErrorCode.INVALID_KEY_ERROR.getMessage(), exception.getMessage());
-			verify(urlShortenerJpaRepository, never()).findByHashKey(anyString());
+			verify(shortUrlJpaRepository, never()).findByHashKey(anyString());
 		}
 	}
 
@@ -285,14 +285,14 @@ class URLShortenerServiceTest {
 			String hashKey = "aB3Xy9Km";
 
 			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(urlShortenerJpaRepository.deleteByHashKey(hashKey)).thenReturn(1);
+			when(shortUrlJpaRepository.deleteByHashKey(hashKey)).thenReturn(1);
 
 			// when
-			urlShortenerService.deleteLink(hashKey);
+			shortUrlService.deleteLink(hashKey);
 
 			// then
 			verify(base62Encoder, times(1)).isValid(hashKey);
-			verify(urlShortenerJpaRepository, times(1)).deleteByHashKey(hashKey);
+			verify(shortUrlJpaRepository, times(1)).deleteByHashKey(hashKey);
 		}
 
 		@Test
@@ -305,10 +305,10 @@ class URLShortenerServiceTest {
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> urlShortenerService.deleteLink(hashKey));
+				() -> shortUrlService.deleteLink(hashKey));
 
 			assertEquals(ErrorCode.INVALID_KEY_ERROR.getMessage(), exception.getMessage());
-			verify(urlShortenerJpaRepository, never()).deleteByHashKey(anyString());
+			verify(shortUrlJpaRepository, never()).deleteByHashKey(anyString());
 		}
 
 		@Test
@@ -318,11 +318,11 @@ class URLShortenerServiceTest {
 			String hashKey = "notExist";
 
 			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(urlShortenerJpaRepository.deleteByHashKey(hashKey)).thenReturn(0);
+			when(shortUrlJpaRepository.deleteByHashKey(hashKey)).thenReturn(0);
 
 			// when & then (예외 발생하지 않아야 함)
-			assertDoesNotThrow(() -> urlShortenerService.deleteLink(hashKey));
-			verify(urlShortenerJpaRepository, times(1)).deleteByHashKey(hashKey);
+			assertDoesNotThrow(() -> shortUrlService.deleteLink(hashKey));
+			verify(shortUrlJpaRepository, times(1)).deleteByHashKey(hashKey);
 		}
 	}
 
@@ -342,10 +342,10 @@ class URLShortenerServiceTest {
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
-			when(urlShortenerJpaRepository.save(any(URLShortener.class))).thenAnswer(i -> i.getArgument(0));
+			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertTrue(response.url().startsWith("http://localhost:8080/"));
@@ -356,7 +356,7 @@ class URLShortenerServiceTest {
 		@DisplayName("성공: 도메인에 이미 슬래시가 있으면 중복 슬래시 없음")
 		void toShortUrl_alreadyHasTrailingSlash() {
 			// given
-			ReflectionTestUtils.setField(urlShortenerService, "redirectionBaseDomain", "http://localhost:8080/");
+			ReflectionTestUtils.setField(shortUrlService, "redirectionBaseDomain", "http://localhost:8080/");
 
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
@@ -366,10 +366,10 @@ class URLShortenerServiceTest {
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
-			when(urlShortenerJpaRepository.save(any(URLShortener.class))).thenAnswer(i -> i.getArgument(0));
+			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertEquals("http://localhost:8080/" + response.hashKey(), response.url());
@@ -380,7 +380,7 @@ class URLShortenerServiceTest {
 		@DisplayName("성공: 도메인에 슬래시가 없어도 자동 추가")
 		void toShortUrl_withoutTrailingSlash() {
 			// given
-			ReflectionTestUtils.setField(urlShortenerService, "redirectionBaseDomain", "http://localhost:8080");
+			ReflectionTestUtils.setField(shortUrlService, "redirectionBaseDomain", "http://localhost:8080");
 
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
@@ -390,10 +390,10 @@ class URLShortenerServiceTest {
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
 			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
-			when(urlShortenerJpaRepository.save(any(URLShortener.class))).thenAnswer(i -> i.getArgument(0));
+			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = urlShortenerService.createLink(redirectUrl);
+			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertTrue(response.url().startsWith("http://localhost:8080/"));
