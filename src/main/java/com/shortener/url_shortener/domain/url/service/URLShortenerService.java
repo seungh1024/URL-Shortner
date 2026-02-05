@@ -68,6 +68,7 @@ public class URLShortenerService {
 
 		int offset = encodedHash.length();
 		long triedOffset = 0;
+		SecureRandom secureRandom = new SecureRandom();
 		for (int i = 0; i < retry; i++) {
 			// DB 저장 전 취소 확인(timeout 등)
 			if (Context.current().isCancelled()) {
@@ -76,7 +77,6 @@ public class URLShortenerService {
 					"Request was cancelled by client"
 				);
 			}
-			SecureRandom secureRandom = new SecureRandom();
 			do {
 				triedOffset |= (1L << offset);
 				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize);
