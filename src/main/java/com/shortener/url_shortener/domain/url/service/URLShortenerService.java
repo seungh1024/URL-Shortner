@@ -11,11 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.URLShortener;
 import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
+import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.Base62Encoder;
 import com.shortener.url_shortener.global.util.HashGenerator;
-import com.shortener.url_shortener.global.util.TsidGenerator;
-import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.ShortenerStringUtil;
+import com.shortener.url_shortener.global.util.TsidGenerator;
 
 import io.grpc.Context;
 import lombok.RequiredArgsConstructor;
@@ -80,9 +80,10 @@ public class URLShortenerService {
 				);
 			}
 			do {
-				triedOffset |= (1L << offset);
 				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize);
-			} while ((triedOffset & (1L << offset)) == 0);
+			} while (isOffsetAlreadyTried(triedOffset, offset));  // 명확한 의미
+			triedOffset |= (1L << offset);
+
 			String hashKey = encodedHash.substring(offset, offset + hashKeySize);
 			if (trySaveHashKey(id, hashKey, redirectURL)) {
 				return new LinkCreateResponse(hashKey, toShortUrl(hashKey));
@@ -130,6 +131,10 @@ public class URLShortenerService {
 				ShortenerStringUtil.format("Invalid parameter from getLink. key: {}", key)
 			);
 		}
+	}
+
+	private boolean isOffsetAlreadyTried(long triedOffset, int offset) {
+		return (triedOffset & (1L << offset)) != 0;
 	}
 
 }
