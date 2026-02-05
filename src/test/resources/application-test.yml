@@ -27,3 +27,8 @@ constant:
     length: 8
     conflict:
       retry: 3
+
+scheduler:
+  expired-url-deletion:
+    cron: "0 0 3 * * *"
+    batch-size: 10

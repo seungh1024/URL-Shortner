@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
-import com.shortener.url_shortener.domain.url.entity.URLShortener;
-import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
+import com.shortener.url_shortener.domain.url.entity.ShortUrl;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.Base62Encoder;
 import com.shortener.url_shortener.global.util.HashGenerator;
@@ -24,10 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class URLShortenerService {
+public class ShortUrlService {
 
 	private final TsidGenerator tsidGenerator;
-	private final URLShortenerJpaRepository urlShortenerJpaRepository;
+	private final ShortUrlJpaRepository shortUrlJpaRepository;
 	private final Base62Encoder base62Encoder;
 	private final HashGenerator hashGenerator;
 
@@ -48,18 +48,18 @@ public class URLShortenerService {
 	@Transactional
 	public String getLink(String key) {
 		validateHashKey(key);
-		URLShortener urlShortener = urlShortenerJpaRepository.findByHashKey(key)
+		ShortUrl shortUrl = shortUrlJpaRepository.findByHashKey(key)
 			.orElseThrow(() -> ErrorCode.KEY_NOT_FOUND.baseException(
 				ShortenerStringUtil.format("Get link failed. key: {}", key)
 			));
 
-		if (urlShortener.isExpired()) {
+		if (shortUrl.isExpired()) {
 			throw ErrorCode.EXPIRED_LINK.baseException(
 				ShortenerStringUtil.format("Link expired. key: {}", key)
 			);
 		}
 
-		return urlShortener.getRedirectionUrl();
+		return shortUrl.getRedirectionUrl();
 	}
 
 	@Transactional
@@ -98,15 +98,15 @@ public class URLShortenerService {
 	@Transactional
 	public void deleteLink(String key) {
 		validateHashKey(key);
-		urlShortenerJpaRepository.deleteByHashKey(key);
+		shortUrlJpaRepository.deleteByHashKey(key);
 	}
 
 	private boolean trySaveHashKey(Long id, String hashKey, String redirectURL) {
 		try {
-			URLShortener urlShortener = new URLShortener(id, hashKey, redirectURL,
+			ShortUrl shortUrl = new ShortUrl(id, hashKey, redirectURL,
 				LocalDateTime.now().plusDays(defaultExpirationDays));
 
-			urlShortenerJpaRepository.save(urlShortener);
+			shortUrlJpaRepository.save(shortUrl);
 			return true;
 
 		} catch (DataIntegrityViolationException e) {

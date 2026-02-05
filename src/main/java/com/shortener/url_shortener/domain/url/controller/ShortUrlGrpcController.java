@@ -8,7 +8,7 @@ import com.shortener.url_shortener.domain.url.DeleteLinkRequest;
 import com.shortener.url_shortener.domain.url.DeleteLinkResponse;
 import com.shortener.url_shortener.domain.url.UrlShortenerRpcGrpc;
 import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
-import com.shortener.url_shortener.domain.url.service.URLShortenerService;
+import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.GrpcExceptionHandler;
 
 import io.grpc.Status;
@@ -27,9 +27,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @GrpcService
 @RequiredArgsConstructor
-public class UrlShortenerGrpcController extends UrlShortenerRpcGrpc.UrlShortenerRpcImplBase {
+public class ShortUrlGrpcController extends UrlShortenerRpcGrpc.UrlShortenerRpcImplBase {
 
-	private final URLShortenerService urlShortenerService;
+	private final ShortUrlService shortUrlService;
 	private final GrpcExceptionHandler exceptionHandler;
 
 	/**
@@ -44,7 +44,7 @@ public class UrlShortenerGrpcController extends UrlShortenerRpcGrpc.UrlShortener
 			log.info("[gRPC] createLink: redirectUrl={}", request.getRedirectUrl());
 
 			// 비즈니스 로직 호출
-			LinkCreateResponse serviceResponse = urlShortenerService.createLink(request.getRedirectUrl());
+			LinkCreateResponse serviceResponse = shortUrlService.createLink(request.getRedirectUrl());
 
 			// gRPC 응답 생성
 			CreateLinkResponse grpcResponse = CreateLinkResponse.newBuilder()
@@ -76,7 +76,7 @@ public class UrlShortenerGrpcController extends UrlShortenerRpcGrpc.UrlShortener
 		try {
 			log.info("[gRPC] deleteLink: hashKey={}", request.getHashKey());
 
-			urlShortenerService.deleteLink(request.getHashKey());
+			shortUrlService.deleteLink(request.getHashKey());
 
 			// 빈 응답 (성공)
 			DeleteLinkResponse grpcResponse = DeleteLinkResponse.newBuilder().build();

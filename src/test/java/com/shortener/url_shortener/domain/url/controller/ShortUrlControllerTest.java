@@ -1,6 +1,6 @@
 package com.shortener.url_shortener.domain.url.controller;
 
-import com.shortener.url_shortener.domain.url.service.URLShortenerService;
+import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,13 +24,13 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("URLShortenerController 단위 테스트")
-class URLShortenerControllerTest {
+class ShortUrlControllerTest {
 
 	@InjectMocks
-	private URLShortenerController urlShortenerController;
+	private ShortUrlController shortUrlController;
 
 	@Mock
-	private URLShortenerService urlShortenerService;
+	private ShortUrlService shortUrlService;
 
 	@Nested
 	@DisplayName("GET /{key} - 리다이렉션 테스트")
@@ -43,10 +43,10 @@ class URLShortenerControllerTest {
 			String hashKey = "aB3Xy9Km";
 			String redirectUrl = "https://example.com/test";
 
-			when(urlShortenerService.getLink(hashKey)).thenReturn(redirectUrl);
+			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
 
 			// when
-			ResponseEntity<Void> response = urlShortenerController.getLink(hashKey);
+			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
 
 			// then
 			assertEquals(HttpStatus.FOUND, response.getStatusCode());
@@ -59,11 +59,11 @@ class URLShortenerControllerTest {
 			// given
 			String hashKey = "notExist";
 
-			when(urlShortenerService.getLink(hashKey))
+			when(shortUrlService.getLink(hashKey))
 				.thenThrow(ErrorCode.KEY_NOT_FOUND.baseException("Key not found"));
 
 			// when & then
-			assertThrows(Exception.class, () -> urlShortenerController.getLink(hashKey));
+			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
 		}
 
 		@Test
@@ -72,11 +72,11 @@ class URLShortenerControllerTest {
 			// given
 			String hashKey = "expired1";
 
-			when(urlShortenerService.getLink(hashKey))
+			when(shortUrlService.getLink(hashKey))
 				.thenThrow(ErrorCode.EXPIRED_LINK.baseException("Link expired"));
 
 			// when & then
-			assertThrows(Exception.class, () -> urlShortenerController.getLink(hashKey));
+			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
 		}
 
 		@Test
@@ -85,11 +85,11 @@ class URLShortenerControllerTest {
 			// given
 			String hashKey = "invalid@key!";
 
-			when(urlShortenerService.getLink(hashKey))
+			when(shortUrlService.getLink(hashKey))
 				.thenThrow(ErrorCode.INVALID_KEY_ERROR.baseException("Invalid key format"));
 
 			// when & then
-			assertThrows(Exception.class, () -> urlShortenerController.getLink(hashKey));
+			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
 		}
 
 		@Test
@@ -99,10 +99,10 @@ class URLShortenerControllerTest {
 			String hashKey = "aB3Xy9Km"; // 0-9, a-z, A-Z
 			String redirectUrl = "https://example.com";
 
-			when(urlShortenerService.getLink(hashKey)).thenReturn(redirectUrl);
+			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
 
 			// when
-			ResponseEntity<Void> response = urlShortenerController.getLink(hashKey);
+			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
 
 			// then
 			assertEquals(HttpStatus.FOUND, response.getStatusCode());
@@ -123,10 +123,10 @@ class URLShortenerControllerTest {
 			};
 
 			for (String url : urls) {
-				when(urlShortenerService.getLink(hashKey)).thenReturn(url);
+				when(shortUrlService.getLink(hashKey)).thenReturn(url);
 
 				// when
-				ResponseEntity<Void> response = urlShortenerController.getLink(hashKey);
+				ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
 
 				// then
 				assertEquals(HttpStatus.FOUND, response.getStatusCode());
@@ -141,10 +141,10 @@ class URLShortenerControllerTest {
 			String hashKey = "testKey";
 			String redirectUrl = "https://example.com";
 
-			when(urlShortenerService.getLink(hashKey)).thenReturn(redirectUrl);
+			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
 
 			// when
-			ResponseEntity<Void> response = urlShortenerController.getLink(hashKey);
+			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
 
 			// then
 			HttpHeaders headers = response.getHeaders();

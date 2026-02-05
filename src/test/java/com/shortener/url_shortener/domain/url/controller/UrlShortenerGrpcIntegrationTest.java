@@ -6,8 +6,8 @@ import com.shortener.url_shortener.domain.url.CreateLinkResponse;
 import com.shortener.url_shortener.domain.url.DeleteLinkRequest;
 import com.shortener.url_shortener.domain.url.DeleteLinkResponse;
 import com.shortener.url_shortener.domain.url.UrlShortenerRpcGrpc;
-import com.shortener.url_shortener.domain.url.entity.URLShortener;
-import com.shortener.url_shortener.domain.url.repository.URLShortenerJpaRepository;
+import com.shortener.url_shortener.domain.url.entity.ShortUrl;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
 import io.grpc.*;
 import io.grpc.stub.MetadataUtils;
 
@@ -39,7 +39,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 	private UrlShortenerRpcGrpc.UrlShortenerRpcBlockingStub blockingStub;
 
 	@Autowired
-	private URLShortenerJpaRepository urlShortenerJpaRepository;
+	private ShortUrlJpaRepository shortUrlJpaRepository;
 
 	@Value("${grpc.server.api-key}")
 	private String validApiKey;
@@ -81,7 +81,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			assertTrue(response.getShortUrl().contains(response.getHashKey()));
 
 			// DB 저장 확인
-			Optional<URLShortener> saved = urlShortenerJpaRepository.findByHashKey(response.getHashKey());
+			Optional<ShortUrl> saved = shortUrlJpaRepository.findByHashKey(response.getHashKey());
 			assertTrue(saved.isPresent());
 			assertEquals(redirectUrl, saved.get().getRedirectionUrl());
 			assertFalse(saved.get().isExpired());
@@ -142,7 +142,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 
 			// then
 			assertNotEquals(response1.getHashKey(), response2.getHashKey());
-			assertEquals(2, urlShortenerJpaRepository.count());
+			assertEquals(2, shortUrlJpaRepository.count());
 		}
 	}
 
@@ -155,13 +155,13 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		void deleteLink_fullFlow_success() {
 			// given
 			String hashKey = "testKey1";
-			URLShortener entity = new URLShortener(
+			ShortUrl entity = new ShortUrl(
 				12345L,
 				hashKey,
 				"https://example.com",
 				LocalDateTime.now().plusDays(7)
 			);
-			urlShortenerJpaRepository.save(entity);
+			shortUrlJpaRepository.save(entity);
 
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
 				.setHashKey(hashKey)
@@ -176,7 +176,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			assertNotNull(response);
 
 			// DB 삭제 확인
-			Optional<URLShortener> deleted = urlShortenerJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> deleted = shortUrlJpaRepository.findByHashKey(hashKey);
 			assertFalse(deleted.isPresent());
 		}
 
@@ -246,7 +246,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			String hashKey = createResponse.getHashKey();
 
 			// 2. 조회 (DB에서 직접)
-			Optional<URLShortener> queried = urlShortenerJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> queried = shortUrlJpaRepository.findByHashKey(hashKey);
 			assertTrue(queried.isPresent());
 			assertEquals(redirectUrl, queried.get().getRedirectionUrl());
 
@@ -258,7 +258,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			assertNotNull(deleteResponse);
 
 			// 4. 삭제 확인
-			Optional<URLShortener> afterDelete = urlShortenerJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> afterDelete = shortUrlJpaRepository.findByHashKey(hashKey);
 			assertFalse(afterDelete.isPresent());
 		}
 
@@ -279,7 +279,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 				CreateLinkRequest.newBuilder().setRedirectUrl("https://example.com/3").build()
 			);
 
-			assertEquals(3, urlShortenerJpaRepository.count());
+			assertEquals(3, shortUrlJpaRepository.count());
 
 			// link2만 삭제
 			authenticatedStub.deleteLink(
@@ -287,10 +287,10 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			);
 
 			// then
-			assertEquals(2, urlShortenerJpaRepository.count());
-			assertTrue(urlShortenerJpaRepository.findByHashKey(link1.getHashKey()).isPresent());
-			assertFalse(urlShortenerJpaRepository.findByHashKey(link2.getHashKey()).isPresent());
-			assertTrue(urlShortenerJpaRepository.findByHashKey(link3.getHashKey()).isPresent());
+			assertEquals(2, shortUrlJpaRepository.count());
+			assertTrue(shortUrlJpaRepository.findByHashKey(link1.getHashKey()).isPresent());
+			assertFalse(shortUrlJpaRepository.findByHashKey(link2.getHashKey()).isPresent());
+			assertTrue(shortUrlJpaRepository.findByHashKey(link3.getHashKey()).isPresent());
 		}
 	}
 }
