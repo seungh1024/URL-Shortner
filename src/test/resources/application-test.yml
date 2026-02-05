@@ -1,0 +1,29 @@
+server:
+  redirection:
+    domain: http://localhost:9090/link
+
+grpc:
+  server:
+    address: 0.0.0.0
+    api-key: ${GRPC_API_KEY:test-api-key}
+    in-process-name: test
+  client:
+    url-shortener:
+      address: in-process:test
+      negotiationType: PLAINTEXT
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+constant:
+  default-expiration-days: 7
+  hash:
+    length: 8
+    conflict:
+      retry: 3

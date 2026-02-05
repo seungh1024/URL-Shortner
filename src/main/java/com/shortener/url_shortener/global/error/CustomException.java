@@ -7,21 +7,24 @@ import lombok.Getter;
 @Getter
 public class CustomException extends RuntimeException {
 
+	private final ErrorCode errorCode;
 	private final HttpStatus httpStatus;
 	private final String message;
 	private final String debugMessage;
 
-	public CustomException(HttpStatus httpStatus, String message) {
-		super(createMessageForm(httpStatus, message, null));
-		this.httpStatus = httpStatus;
-		this.message = message;
+	public CustomException(ErrorCode errorCode) {
+		super(createMessageForm(errorCode.getStatus(), errorCode.getMessage(), null));
+		this.errorCode = errorCode;
+		this.httpStatus = errorCode.getStatus();
+		this.message = errorCode.getMessage();
 		this.debugMessage = null;
 	}
 
-	public CustomException(HttpStatus httpStatus, String message, String debugMessage) {
-		super(createMessageForm(httpStatus, message, debugMessage));
-		this.httpStatus = httpStatus;
-		this.message = message;
+	public CustomException(ErrorCode errorCode, String debugMessage) {
+		super(createMessageForm(errorCode.getStatus(), errorCode.getMessage(), debugMessage));
+		this.errorCode = errorCode;
+		this.httpStatus = errorCode.getStatus();
+		this.message = errorCode.getMessage();
 		this.debugMessage = debugMessage;
 	}
 
