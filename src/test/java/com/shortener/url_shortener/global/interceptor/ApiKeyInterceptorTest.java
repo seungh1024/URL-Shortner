@@ -117,7 +117,7 @@ class ApiKeyInterceptorTest {
 			headers.put(API_KEY_METADATA_KEY, "");  // 빈 문자열
 
 			// when
-			ServerCall.Listener<String> result = interceptor.interceptCall(serverCall, headers, next);
+			interceptor.interceptCall(serverCall, headers, next);
 
 			// then
 			verify(serverCall, times(1)).close(statusCaptor.capture(), metadataCaptor.capture());
@@ -136,7 +136,7 @@ class ApiKeyInterceptorTest {
 			headers.put(API_KEY_METADATA_KEY, "wrong-api-key");
 
 			// when
-			ServerCall.Listener<String> result = interceptor.interceptCall(serverCall, headers, next);
+			interceptor.interceptCall(serverCall, headers, next);
 
 			// then
 			verify(serverCall, times(1)).close(statusCaptor.capture(), metadataCaptor.capture());
@@ -155,7 +155,7 @@ class ApiKeyInterceptorTest {
 			headers.put(API_KEY_METADATA_KEY, VALID_API_KEY.toUpperCase());
 
 			// when
-			ServerCall.Listener<String> result = interceptor.interceptCall(serverCall, headers, next);
+			interceptor.interceptCall(serverCall, headers, next);
 
 			// then
 			verify(serverCall, times(1)).close(statusCaptor.capture(), metadataCaptor.capture());

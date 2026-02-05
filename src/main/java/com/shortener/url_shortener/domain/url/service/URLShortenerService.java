@@ -76,9 +76,10 @@ public class URLShortenerService {
 					"Request was cancelled by client"
 				);
 			}
+			SecureRandom secureRandom = new SecureRandom();
 			do {
 				triedOffset |= (1L << offset);
-				offset = new SecureRandom().nextInt(encodedHash.length() - hashKeySize);
+				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize);
 			} while ((triedOffset & (1L << offset)) == 0);
 			String hashKey = encodedHash.substring(offset, offset + hashKeySize);
 			if (trySaveHashKey(id, hashKey, redirectURL)) {

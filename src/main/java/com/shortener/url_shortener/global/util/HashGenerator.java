@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import com.shortener.url_shortener.global.error.ErrorCode;
+
 @Slf4j
 @Component
 public class HashGenerator {
@@ -24,7 +26,7 @@ public class HashGenerator {
 			return digest.digest(input.getBytes(StandardCharsets.UTF_8));
 		} catch (NoSuchAlgorithmException e) {
 			log.error("SHA-256 algorithm not available", e);
-			throw new RuntimeException("Failed to generate hash", e);
+			throw ErrorCode.HASHING_FAILED.baseException("Failed to generate hash",e);
 		}
 	}
 

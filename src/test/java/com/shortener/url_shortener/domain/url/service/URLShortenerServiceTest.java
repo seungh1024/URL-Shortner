@@ -75,7 +75,6 @@ class URLShortenerServiceTest {
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
 			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
-			String hashKey = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
 			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);

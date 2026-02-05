@@ -221,7 +221,7 @@ class Base62EncoderTest {
 
 			// then
 			assertNotNull(result);
-			assertTrue(result.length() > 0);
+			assertFalse(result.isEmpty());
 			assertTrue(encoder.isValid(result));
 		}
 	}
