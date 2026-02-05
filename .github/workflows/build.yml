@@ -43,7 +43,7 @@ jobs:
       - name: Create application-secret.yml
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.APPLICATION_SECRET_YML_B64 }}" | base64 -d > src/main/resources/application-secret.yml
+          printf '%s' "${{ secrets.APPLICATION_SECRET_YML_B64 }}" | base64 -d > src/main/resources/application-secret.yml
 
       - name: Test + JaCoCo + Sonar analyze
         if: github.event_name == 'push'
