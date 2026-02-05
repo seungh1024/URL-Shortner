@@ -1,0 +1,31 @@
+spring:
+  profiles:
+    include: secret
+---
+
+server:
+  port: 9090
+  redirection:
+    domain: http://localhost:9090/link
+
+grpc:
+  server:
+    port: 9091
+    address: 0.0.0.0
+    api-key: ${GRPC_API_KEY:test-api-key}
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+constant:
+  default-expiration-days: 7
+  hash:
+    length: 8
+    conflict:
+      retry: 3
