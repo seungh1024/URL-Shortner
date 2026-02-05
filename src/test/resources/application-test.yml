@@ -1,13 +1,16 @@
 server:
-  port: 9090
   redirection:
     domain: http://localhost:9090/link
 
 grpc:
   server:
-    port: 9091
     address: 0.0.0.0
     api-key: ${GRPC_API_KEY:test-api-key}
+    in-process-name: test
+  client:
+    url-shortener:
+      address: in-process:test
+      negotiationType: PLAINTEXT
 
 spring:
   jpa:
