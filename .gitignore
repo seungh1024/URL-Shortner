@@ -47,3 +47,13 @@ application-secret.yml
 telegraf.conf
 
 rabbitmq/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# local-only artifacts
+.qodo/
+URL-Shortner/
+AGENTS.md
+.gitattributes
