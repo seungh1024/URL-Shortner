@@ -23,6 +23,8 @@ spring:
 
 constant:
   default-expiration-days: 7
+  url:
+    max-length: 2048
   hash:
     length: 8
     conflict:
