@@ -1,5 +1,8 @@
 package com.shortener.url_shortener.domain.url.controller;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -7,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -15,6 +19,7 @@ import com.shortener.url_shortener.container.IntegrationTestBase;
 import com.shortener.url_shortener.domain.url.entity.ShortUrl;
 import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -52,7 +57,7 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "testKey1";
 			String redirectUrl = "https://example.com/test";
-			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl, LocalDateTime.now().plusDays(7));
+			ShortUrl entity = newShortUrl(123456789L, hashKey, redirectUrl, LocalDateTime.now().plusDays(7));
 			shortUrlJpaRepository.save(entity);
 
 			// when & then
@@ -79,7 +84,7 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "expired1";
 			String redirectUrl = "https://example.com/expired";
-			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl,
+			ShortUrl entity = newShortUrl(123456789L, hashKey, redirectUrl,
 				LocalDateTime.now().minusDays(1) // 이미 만료됨
 			);
 			shortUrlJpaRepository.save(entity);
@@ -96,7 +101,7 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 			// given
 			String hashKey = "almostEx";
 			String redirectUrl = "https://example.com/almost-expired";
-			ShortUrl entity = new ShortUrl(123456789L, hashKey, redirectUrl,
+			ShortUrl entity = newShortUrl(123456789L, hashKey, redirectUrl,
 				LocalDateTime.now().plusMinutes(1) // 1분 남음
 			);
 			shortUrlJpaRepository.save(entity);
@@ -127,7 +132,7 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 
 			for (String key : keys) {
 				String redirectUrl = "https://example.com/" + key;
-				ShortUrl entity = new ShortUrl(System.currentTimeMillis(), key, redirectUrl,
+				ShortUrl entity = newShortUrl(System.currentTimeMillis(), key, redirectUrl,
 					LocalDateTime.now().plusDays(7));
 				shortUrlJpaRepository.save(entity);
 
@@ -136,6 +141,101 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 					.andExpect(status().isFound())
 					.andExpect(header().string("Location", redirectUrl));
 			}
+		}
+	}
+
+	@Nested
+	@DisplayName("POST /link 통합 테스트")
+	class CreateLinkIntegrationTest {
+
+		@Test
+		@DisplayName("성공: 단축 URL 생성 후 응답 반환")
+		void createLink_success() throws Exception {
+			// given
+			String redirectUrl = "https://example.com/create";
+			String requestBody = """
+				{"redirectUrl":"%s"}
+				""".formatted(redirectUrl);
+
+			// when
+			String responseBody = mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.shortCode").isNotEmpty())
+				.andExpect(jsonPath("$.url").isNotEmpty())
+				.andReturn()
+				.getResponse()
+				.getContentAsString();
+
+			// then
+			ShortUrl saved = shortUrlJpaRepository.findAll().get(0);
+			assertThat(saved.getShortCode()).hasSize(8);
+			assertThat(responseBody).contains(saved.getShortCode());
+			assertThat(saved.getRedirectionUrl()).isEqualTo(redirectUrl);
+		}
+
+		@Test
+		@DisplayName("실패: redirectUrl 누락 시 400")
+		void createLink_missingRedirectUrl_badRequest() throws Exception {
+			// given
+			String requestBody = """
+				{"redirectUrl":""}
+				""";
+
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").exists());
+		}
+
+		@Test
+		@DisplayName("실패: 잘못된 URL 스킴이면 400")
+		void createLink_invalidScheme_badRequest() throws Exception {
+			// given
+			String requestBody = """
+				{"redirectUrl":"ftp://example.com"}
+				""";
+
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("올바르지 않은 파라미터입니다."));
+		}
+
+		@Test
+		@DisplayName("실패: URL 길이가 제한을 초과하면 400")
+		void createLink_exceedsMaxLength_badRequest() throws Exception {
+			// given
+			String longPath = "a".repeat(2100);
+			String redirectUrl = "http://example.com/" + longPath;
+			String requestBody = """
+				{"redirectUrl":"%s"}
+				""".formatted(redirectUrl);
+
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("올바르지 않은 파라미터입니다."));
+		}
+	}
+
+	private ShortUrl newShortUrl(Long id, String shortCode, String redirectUrl, LocalDateTime expiredAt) {
+		return new ShortUrl(id, sha256(redirectUrl), shortCode, redirectUrl, expiredAt);
+	}
+
+	private byte[] sha256(String input) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			return digest.digest(input.getBytes(StandardCharsets.UTF_8));
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("SHA-256 not available", e);
 		}
 	}
 

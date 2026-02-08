@@ -239,7 +239,7 @@ class ShortUrlSchedulerIntegrationTest extends IntegrationTestBase {
 			assertEquals(1, remainingCount, "현재 시각 이후만 남아야 함");
 
 			ShortUrl remaining = shortUrlJpaRepository.findAll().get(0);
-			assertEquals("future", remaining.getHashKey());
+			assertEquals("future", remaining.getShortCode());
 		}
 	}
 

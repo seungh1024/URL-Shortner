@@ -1,8 +1,9 @@
 package com.shortener.url_shortener.domain.url.service;
 
-import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
+import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.ShortUrl;
 import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlLockRepository;
 import com.shortener.url_shortener.global.error.CustomException;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.Base62Encoder;
@@ -21,11 +22,15 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.security.SecureRandom;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -52,6 +57,9 @@ class ShortUrlServiceTest {
 	@Mock
 	private HashGenerator hashGenerator;
 
+	@Mock
+	private ShortUrlLockRepository shortUrlLockRepository;
+
 	@InjectMocks
 	private ShortUrlService shortUrlService;
 
@@ -61,6 +69,12 @@ class ShortUrlServiceTest {
 		ReflectionTestUtils.setField(shortUrlService, "defaultExpirationDays", 7);
 		ReflectionTestUtils.setField(shortUrlService, "hashKeySize", 8);
 		ReflectionTestUtils.setField(shortUrlService, "retry", 3);
+		ReflectionTestUtils.setField(shortUrlService, "maxUrlLength", 2048);
+		ReflectionTestUtils.setField(shortUrlService, "lockTimeoutSeconds", 3);
+
+		lenient().when(shortUrlLockRepository.acquireLock(anyString(), anyInt()))
+			.thenReturn(true);
+		lenient().doNothing().when(shortUrlLockRepository).releaseLock(anyString());
 	}
 
 	@Nested
@@ -74,22 +88,53 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
+			String shortCode = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class))).thenReturn(shortCode);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertNotNull(response);
-			assertEquals(8, response.hashKey().length());
-			assertTrue(response.url().contains(response.hashKey()));
+			assertEquals(8, response.shortCode().length());
+			assertTrue(response.url().contains(response.shortCode()));
 			verify(tsidGenerator, times(1)).nextKey();
 			verify(shortUrlJpaRepository, times(1)).save(any(ShortUrl.class));
+		}
+
+		@Test
+		@DisplayName("성공: 동일 URL이 이미 존재하면 기존 shortCode 반환")
+		void createLink_existingUrl_returnsExistingShortCode() {
+			// given
+			String redirectUrl = "https://example.com";
+			byte[] hash = new byte[]{1, 2, 3, 4};
+			String existingShortCode = "aB3Xy9Km";
+			ShortUrl existing = new ShortUrl(
+				123456789L,
+				hash,
+				existingShortCode,
+				redirectUrl,
+				LocalDateTime.now().plusDays(7)
+			);
+
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of(existing));
+
+			// when
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
+
+			// then
+			assertEquals(existingShortCode, response.shortCode());
+			assertEquals("http://localhost:8080/" + existingShortCode, response.url());
+			verify(tsidGenerator, never()).nextKey();
+			verify(shortUrlJpaRepository, never()).save(any(ShortUrl.class));
 		}
 
 		@Test
@@ -99,11 +144,15 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
+			String shortCode1 = "aB3Xy9Km";
+			String shortCode2 = "bB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class)))
+				.thenReturn(shortCode1, shortCode2);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 
 			// 첫 번째 시도: 충돌
 			when(shortUrlJpaRepository.save(any(ShortUrl.class)))
@@ -111,7 +160,7 @@ class ShortUrlServiceTest {
 				.thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertNotNull(response);
@@ -125,11 +174,11 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 
 			// 모든 시도 충돌
 			when(shortUrlJpaRepository.save(any(ShortUrl.class)))
@@ -150,11 +199,11 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 
 			Context.CancellableContext ctx = Context.current().withCancellation();
 			ctx.cancel(new RuntimeException("cancelled"));
@@ -168,25 +217,67 @@ class ShortUrlServiceTest {
 		}
 
 		@Test
+		@DisplayName("실패: 지원하지 않는 스킴이면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_invalidScheme() {
+			// given
+			String redirectUrl = "ftp://example.com";
+
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(redirectUrl));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
+		@DisplayName("실패: 호스트 정보가 없으면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_missingHost() {
+			// given
+			String redirectUrl = "http:///path-only";
+
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(redirectUrl));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
+		@DisplayName("실패: URL 길이가 제한을 초과하면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_exceedsMaxLength() {
+			// given
+			String longPath = "a".repeat(2100);
+			String redirectUrl = "http://example.com/" + longPath;
+
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(redirectUrl));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
 		@DisplayName("성공: Base62 인코딩 결과에서 8글자 부분 문자열 추출")
 		void createLink_extractsCorrectLength() {
 			// given
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC"; // 20글자
+			String shortCode = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class))).thenReturn(shortCode);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
-			assertEquals(8, response.hashKey().length());
-			assertTrue(encodedHash.contains(response.hashKey()));
+			assertEquals(8, response.shortCode().length());
+			assertEquals(shortCode, response.shortCode());
 		}
 	}
 
@@ -198,38 +289,39 @@ class ShortUrlServiceTest {
 		@DisplayName("성공: 유효한 키로 리다이렉션 URL 조회")
 		void getLink_success() {
 			// given
-			String hashKey = "aB3Xy9Km";
+			String shortCode = "aB3Xy9Km";
 			String redirectUrl = "https://example.com";
 			ShortUrl shortUrl = new ShortUrl(
 				123456789L,
-				hashKey,
+				new byte[]{1, 2, 3, 4},
+				shortCode,
 				redirectUrl,
 				LocalDateTime.now().plusDays(7)
 			);
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(shortUrl));
+			when(base62Encoder.isValid(shortCode)).thenReturn(true);
+			when(shortUrlJpaRepository.findByShortCode(shortCode)).thenReturn(Optional.of(shortUrl));
 
 			// when
-			String result = shortUrlService.getLink(hashKey);
+			String result = shortUrlService.getLink(shortCode);
 
 			// then
 			assertEquals(redirectUrl, result);
-			verify(shortUrlJpaRepository, times(1)).findByHashKey(hashKey);
+			verify(shortUrlJpaRepository, times(1)).findByShortCode(shortCode);
 		}
 
 		@Test
 		@DisplayName("실패: 존재하지 않는 키 조회 시 KEY_NOT_FOUND 예외")
 		void getLink_keyNotFound() {
 			// given
-			String hashKey = "notExist";
+			String shortCode = "notExist";
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.empty());
+			when(base62Encoder.isValid(shortCode)).thenReturn(true);
+			when(shortUrlJpaRepository.findByShortCode(shortCode)).thenReturn(Optional.empty());
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> shortUrlService.getLink(hashKey));
+				() -> shortUrlService.getLink(shortCode));
 
 			assertEquals(ErrorCode.KEY_NOT_FOUND.getMessage(), exception.getMessage());
 		}
@@ -238,21 +330,22 @@ class ShortUrlServiceTest {
 		@DisplayName("실패: 만료된 링크 조회 시 EXPIRED_LINK 예외")
 		void getLink_expiredLink() {
 			// given
-			String hashKey = "expired1";
+			String shortCode = "expired1";
 			String redirectUrl = "https://example.com";
 			ShortUrl shortUrl = new ShortUrl(
 				123456789L,
-				hashKey,
+				new byte[]{1, 2, 3, 4},
+				shortCode,
 				redirectUrl,
 				LocalDateTime.now().minusDays(1) // 이미 만료됨
 			);
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(shortUrlJpaRepository.findByHashKey(hashKey)).thenReturn(Optional.of(shortUrl));
+			when(base62Encoder.isValid(shortCode)).thenReturn(true);
+			when(shortUrlJpaRepository.findByShortCode(shortCode)).thenReturn(Optional.of(shortUrl));
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> shortUrlService.getLink(hashKey));
+				() -> shortUrlService.getLink(shortCode));
 
 			assertEquals(ErrorCode.EXPIRED_LINK.getMessage(), exception.getMessage());
 		}
@@ -261,16 +354,16 @@ class ShortUrlServiceTest {
 		@DisplayName("실패: 잘못된 키 형식 시 INVALID_KEY_ERROR 예외")
 		void getLink_invalidKeyFormat() {
 			// given
-			String hashKey = "invalid@key!";
+			String shortCode = "invalid@key!";
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(false);
+			when(base62Encoder.isValid(shortCode)).thenReturn(false);
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> shortUrlService.getLink(hashKey));
+				() -> shortUrlService.getLink(shortCode));
 
 			assertEquals(ErrorCode.INVALID_KEY_ERROR.getMessage(), exception.getMessage());
-			verify(shortUrlJpaRepository, never()).findByHashKey(anyString());
+			verify(shortUrlJpaRepository, never()).findByShortCode(anyString());
 		}
 	}
 
@@ -282,47 +375,47 @@ class ShortUrlServiceTest {
 		@DisplayName("성공: 유효한 키로 삭제")
 		void deleteLink_success() {
 			// given
-			String hashKey = "aB3Xy9Km";
+			String shortCode = "aB3Xy9Km";
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(shortUrlJpaRepository.deleteByHashKey(hashKey)).thenReturn(1);
+			when(base62Encoder.isValid(shortCode)).thenReturn(true);
+			when(shortUrlJpaRepository.deleteByShortCode(shortCode)).thenReturn(1);
 
 			// when
-			shortUrlService.deleteLink(hashKey);
+			shortUrlService.deleteLink(shortCode);
 
 			// then
-			verify(base62Encoder, times(1)).isValid(hashKey);
-			verify(shortUrlJpaRepository, times(1)).deleteByHashKey(hashKey);
+			verify(base62Encoder, times(1)).isValid(shortCode);
+			verify(shortUrlJpaRepository, times(1)).deleteByShortCode(shortCode);
 		}
 
 		@Test
 		@DisplayName("실패: 잘못된 키 형식 시 INVALID_KEY_ERROR 예외")
 		void deleteLink_invalidKey() {
 			// given
-			String hashKey = "invalid@key!";
+			String shortCode = "invalid@key!";
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(false);
+			when(base62Encoder.isValid(shortCode)).thenReturn(false);
 
 			// when & then
 			CustomException exception = assertThrows(CustomException.class,
-				() -> shortUrlService.deleteLink(hashKey));
+				() -> shortUrlService.deleteLink(shortCode));
 
 			assertEquals(ErrorCode.INVALID_KEY_ERROR.getMessage(), exception.getMessage());
-			verify(shortUrlJpaRepository, never()).deleteByHashKey(anyString());
+			verify(shortUrlJpaRepository, never()).deleteByShortCode(anyString());
 		}
 
 		@Test
 		@DisplayName("성공: 존재하지 않는 키 삭제 시도 (에러 없음)")
 		void deleteLink_nonExistentKey() {
 			// given
-			String hashKey = "notExist";
+			String shortCode = "notExist";
 
-			when(base62Encoder.isValid(hashKey)).thenReturn(true);
-			when(shortUrlJpaRepository.deleteByHashKey(hashKey)).thenReturn(0);
+			when(base62Encoder.isValid(shortCode)).thenReturn(true);
+			when(shortUrlJpaRepository.deleteByShortCode(shortCode)).thenReturn(0);
 
 			// when & then (예외 발생하지 않아야 함)
-			assertDoesNotThrow(() -> shortUrlService.deleteLink(hashKey));
-			verify(shortUrlJpaRepository, times(1)).deleteByHashKey(hashKey);
+			assertDoesNotThrow(() -> shortUrlService.deleteLink(shortCode));
+			verify(shortUrlJpaRepository, times(1)).deleteByShortCode(shortCode);
 		}
 	}
 
@@ -337,19 +430,21 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
+			String shortCode = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class))).thenReturn(shortCode);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertTrue(response.url().startsWith("http://localhost:8080/"));
-			assertEquals("http://localhost:8080/" + response.hashKey(), response.url());
+			assertEquals("http://localhost:8080/" + response.shortCode(), response.url());
 		}
 
 		@Test
@@ -361,19 +456,21 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
+			String shortCode = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class))).thenReturn(shortCode);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
-			assertEquals("http://localhost:8080/" + response.hashKey(), response.url());
-			assertFalse(response.url().contains("//" + response.hashKey()));
+			assertEquals("http://localhost:8080/" + response.shortCode(), response.url());
+			assertFalse(response.url().contains("//" + response.shortCode()));
 		}
 
 		@Test
@@ -385,15 +482,17 @@ class ShortUrlServiceTest {
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;
 			byte[] hash = new byte[]{1, 2, 3, 4};
-			String encodedHash = "aB3Xy9KmP2qLnR5vT8wC";
+			String shortCode = "aB3Xy9Km";
 
 			when(tsidGenerator.nextKey()).thenReturn(tsid);
-			when(hashGenerator.hash(tsid, redirectUrl)).thenReturn(hash);
-			when(base62Encoder.encode(hash)).thenReturn(encodedHash);
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(base62Encoder.random(eq(8), any(SecureRandom.class))).thenReturn(shortCode);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of());
 			when(shortUrlJpaRepository.save(any(ShortUrl.class))).thenAnswer(i -> i.getArgument(0));
 
 			// when
-			LinkCreateResponse response = shortUrlService.createLink(redirectUrl);
+			ShortUrlCreateResponse response = shortUrlService.createLink(redirectUrl);
 
 			// then
 			assertTrue(response.url().startsWith("http://localhost:8080/"));

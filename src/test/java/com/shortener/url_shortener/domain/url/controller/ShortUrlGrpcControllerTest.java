@@ -4,7 +4,7 @@ import com.shortener.url_shortener.domain.url.CreateLinkRequest;
 import com.shortener.url_shortener.domain.url.CreateLinkResponse;
 import com.shortener.url_shortener.domain.url.DeleteLinkRequest;
 import com.shortener.url_shortener.domain.url.DeleteLinkResponse;
-import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
+import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.CustomException;
 import com.shortener.url_shortener.global.error.ErrorCode;
@@ -75,14 +75,14 @@ class ShortUrlGrpcControllerTest {
 		void createLink_success() {
 			// given
 			String redirectUrl = "https://example.com";
-			String hashKey = "aB3Xy9Km";
+			String shortCode = "aB3Xy9Km";
 			String shortUrl = "http://localhost:8080/aB3Xy9Km";
 
 			CreateLinkRequest request = CreateLinkRequest.newBuilder()
 				.setRedirectUrl(redirectUrl)
 				.build();
 
-			LinkCreateResponse serviceResponse = new LinkCreateResponse(hashKey, shortUrl);
+			ShortUrlCreateResponse serviceResponse = new ShortUrlCreateResponse(shortCode, shortUrl);
 			when(shortUrlService.createLink(redirectUrl)).thenReturn(serviceResponse);
 
 			// when
@@ -95,7 +95,7 @@ class ShortUrlGrpcControllerTest {
 			verify(createLinkObserver, never()).onError(any());
 
 			CreateLinkResponse response = createLinkResponseCaptor.getValue();
-			assertEquals(hashKey, response.getHashKey());
+			assertEquals(shortCode, response.getShortCode());
 			assertEquals(shortUrl, response.getShortUrl());
 		}
 
@@ -183,18 +183,18 @@ class ShortUrlGrpcControllerTest {
 		@DisplayName("성공: 정상적으로 단축 URL 삭제")
 		void deleteLink_success() {
 			// given
-			String hashKey = "aB3Xy9Km";
+			String shortCode = "aB3Xy9Km";
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey(hashKey)
+				.setShortCode(shortCode)
 				.build();
 
-			doNothing().when(shortUrlService).deleteLink(hashKey);
+			doNothing().when(shortUrlService).deleteLink(shortCode);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);
 
 			// then
-			verify(shortUrlService, times(1)).deleteLink(hashKey);
+			verify(shortUrlService, times(1)).deleteLink(shortCode);
 			verify(deleteLinkObserver, times(1)).onNext(deleteLinkResponseCaptor.capture());
 			verify(deleteLinkObserver, times(1)).onCompleted();
 			verify(deleteLinkObserver, never()).onError(any());
@@ -207,21 +207,21 @@ class ShortUrlGrpcControllerTest {
 		@DisplayName("실패: 존재하지 않는 키 삭제 시 NOT_FOUND 에러")
 		void deleteLink_keyNotFound() {
 			// given
-			String hashKey = "notExist";
+			String shortCode = "notExist";
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey(hashKey)
+				.setShortCode(shortCode)
 				.build();
 
 			CustomException exception = ErrorCode.KEY_NOT_FOUND.baseException(
 				"Key not found"
 			);
-			doThrow(exception).when(shortUrlService).deleteLink(hashKey);
+			doThrow(exception).when(shortUrlService).deleteLink(shortCode);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);
 
 			// then
-			verify(shortUrlService, times(1)).deleteLink(hashKey);
+			verify(shortUrlService, times(1)).deleteLink(shortCode);
 			verify(deleteLinkObserver, never()).onNext(any());
 			verify(deleteLinkObserver, never()).onCompleted();
 			verify(deleteLinkObserver, times(1)).onError(exceptionCaptor.capture());
@@ -234,15 +234,15 @@ class ShortUrlGrpcControllerTest {
 		@DisplayName("실패: 잘못된 키 형식 시 INVALID_ARGUMENT 에러")
 		void deleteLink_invalidKey() {
 			// given
-			String hashKey = "invalid@key!";
+			String shortCode = "invalid@key!";
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey(hashKey)
+				.setShortCode(shortCode)
 				.build();
 
 			CustomException exception = ErrorCode.INVALID_KEY_ERROR.baseException(
 				"Invalid key format"
 			);
-			doThrow(exception).when(shortUrlService).deleteLink(hashKey);
+			doThrow(exception).when(shortUrlService).deleteLink(shortCode);
 
 			// when
 			controller.deleteLink(request, deleteLinkObserver);

@@ -76,12 +76,12 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 
 			// then
 			assertNotNull(response);
-			assertNotNull(response.getHashKey());
-			assertEquals(8, response.getHashKey().length());
-			assertTrue(response.getShortUrl().contains(response.getHashKey()));
+			assertNotNull(response.getShortCode());
+			assertEquals(8, response.getShortCode().length());
+			assertTrue(response.getShortUrl().contains(response.getShortCode()));
 
 			// DB 저장 확인
-			Optional<ShortUrl> saved = shortUrlJpaRepository.findByHashKey(response.getHashKey());
+			Optional<ShortUrl> saved = shortUrlJpaRepository.findByShortCode(response.getShortCode());
 			assertTrue(saved.isPresent());
 			assertEquals(redirectUrl, saved.get().getRedirectionUrl());
 			assertFalse(saved.get().isExpired());
@@ -126,8 +126,8 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		}
 
 		@Test
-		@DisplayName("성공: 동일한 URL로 여러 번 요청 시 서로 다른 hashKey 생성")
-		void createLink_sameUrl_differentKeys() {
+		@DisplayName("성공: 동일한 URL로 여러 번 요청 시 동일한 shortCode 반환")
+		void createLink_sameUrl_sameCode() {
 			// given
 			String redirectUrl = "https://example.com/same";
 			CreateLinkRequest request = CreateLinkRequest.newBuilder()
@@ -141,8 +141,8 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			CreateLinkResponse response2 = authenticatedStub.createLink(request);
 
 			// then
-			assertNotEquals(response1.getHashKey(), response2.getHashKey());
-			assertEquals(2, shortUrlJpaRepository.count());
+			assertEquals(response1.getShortCode(), response2.getShortCode());
+			assertEquals(1, shortUrlJpaRepository.count());
 		}
 	}
 
@@ -154,17 +154,17 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		@DisplayName("성공: API Key 인증 + DB 삭제")
 		void deleteLink_fullFlow_success() {
 			// given
-			String hashKey = "testKey1";
+			String shortCode = "testKey1";
 			ShortUrl entity = new ShortUrl(
 				12345L,
-				hashKey,
+				shortCode,
 				"https://example.com",
 				LocalDateTime.now().plusDays(7)
 			);
 			shortUrlJpaRepository.save(entity);
 
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey(hashKey)
+				.setShortCode(shortCode)
 				.build();
 
 			UrlShortenerRpcGrpc.UrlShortenerRpcBlockingStub authenticatedStub = createAuthenticatedStub();
@@ -176,7 +176,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 			assertNotNull(response);
 
 			// DB 삭제 확인
-			Optional<ShortUrl> deleted = shortUrlJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> deleted = shortUrlJpaRepository.findByShortCode(shortCode);
 			assertFalse(deleted.isPresent());
 		}
 
@@ -185,7 +185,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		void deleteLink_withoutApiKey_unauthenticated() {
 			// given
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey("testKey")
+				.setShortCode("testKey")
 				.build();
 
 			// when & then
@@ -200,7 +200,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		void deleteLink_nonExistentKey_noError() {
 			// given
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey("notExist")
+				.setShortCode("notExist")
 				.build();
 
 			UrlShortenerRpcGrpc.UrlShortenerRpcBlockingStub authenticatedStub = createAuthenticatedStub();
@@ -214,7 +214,7 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 		void deleteLink_invalidKey_invalidArgument() {
 			// given
 			DeleteLinkRequest request = DeleteLinkRequest.newBuilder()
-				.setHashKey("invalid@key!")
+				.setShortCode("invalid@key!")
 				.build();
 
 			UrlShortenerRpcGrpc.UrlShortenerRpcBlockingStub authenticatedStub = createAuthenticatedStub();
@@ -243,22 +243,22 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 				.setRedirectUrl(redirectUrl)
 				.build();
 			CreateLinkResponse createResponse = authenticatedStub.createLink(createRequest);
-			String hashKey = createResponse.getHashKey();
+			String shortCode = createResponse.getShortCode();
 
 			// 2. 조회 (DB에서 직접)
-			Optional<ShortUrl> queried = shortUrlJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> queried = shortUrlJpaRepository.findByShortCode(shortCode);
 			assertTrue(queried.isPresent());
 			assertEquals(redirectUrl, queried.get().getRedirectionUrl());
 
 			// 3. 삭제
 			DeleteLinkRequest deleteRequest = DeleteLinkRequest.newBuilder()
-				.setHashKey(hashKey)
+				.setShortCode(shortCode)
 				.build();
 			DeleteLinkResponse deleteResponse = authenticatedStub.deleteLink(deleteRequest);
 			assertNotNull(deleteResponse);
 
 			// 4. 삭제 확인
-			Optional<ShortUrl> afterDelete = shortUrlJpaRepository.findByHashKey(hashKey);
+			Optional<ShortUrl> afterDelete = shortUrlJpaRepository.findByShortCode(shortCode);
 			assertFalse(afterDelete.isPresent());
 		}
 
@@ -283,14 +283,14 @@ class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 
 			// link2만 삭제
 			authenticatedStub.deleteLink(
-				DeleteLinkRequest.newBuilder().setHashKey(link2.getHashKey()).build()
+				DeleteLinkRequest.newBuilder().setShortCode(link2.getShortCode()).build()
 			);
 
 			// then
 			assertEquals(2, shortUrlJpaRepository.count());
-			assertTrue(shortUrlJpaRepository.findByHashKey(link1.getHashKey()).isPresent());
-			assertFalse(shortUrlJpaRepository.findByHashKey(link2.getHashKey()).isPresent());
-			assertTrue(shortUrlJpaRepository.findByHashKey(link3.getHashKey()).isPresent());
+			assertTrue(shortUrlJpaRepository.findByShortCode(link1.getShortCode()).isPresent());
+			assertFalse(shortUrlJpaRepository.findByShortCode(link2.getShortCode()).isPresent());
+			assertTrue(shortUrlJpaRepository.findByShortCode(link3.getShortCode()).isPresent());
 		}
 	}
 }
