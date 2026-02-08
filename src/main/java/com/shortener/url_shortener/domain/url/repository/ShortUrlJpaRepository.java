@@ -15,9 +15,11 @@ import com.shortener.url_shortener.domain.url.entity.ShortUrl;
 @Repository
 public interface ShortUrlJpaRepository extends JpaRepository<ShortUrl, Long> {
 
-	Optional<ShortUrl> findByHashKey(String key);
+	List<ShortUrl> findByHashKeyAndExpiredAtAfter(byte[] hashKey, LocalDateTime now);
 
-	int deleteByHashKey(String hashKey);
+	Optional<ShortUrl> findByShortCode(String shortCode);
+
+	int deleteByShortCode(String shortCode);
 
 	@Query(value = """
 			SELECT expired_at, id

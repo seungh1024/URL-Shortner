@@ -7,7 +7,7 @@ import com.shortener.url_shortener.domain.url.CreateLinkResponse;
 import com.shortener.url_shortener.domain.url.DeleteLinkRequest;
 import com.shortener.url_shortener.domain.url.DeleteLinkResponse;
 import com.shortener.url_shortener.domain.url.UrlShortenerRpcGrpc;
-import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
+import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.GrpcExceptionHandler;
 
@@ -44,18 +44,18 @@ public class ShortUrlGrpcController extends UrlShortenerRpcGrpc.UrlShortenerRpcI
 			log.info("[gRPC] createLink: redirectUrl={}", request.getRedirectUrl());
 
 			// 비즈니스 로직 호출
-			LinkCreateResponse serviceResponse = shortUrlService.createLink(request.getRedirectUrl());
+			ShortUrlCreateResponse serviceResponse = shortUrlService.createLink(request.getRedirectUrl());
 
 			// gRPC 응답 생성
 			CreateLinkResponse grpcResponse = CreateLinkResponse.newBuilder()
-				.setHashKey(serviceResponse.hashKey())
+				.setShortCode(serviceResponse.shortCode())
 				.setShortUrl(serviceResponse.url())
 				.build();
 
 			responseObserver.onNext(grpcResponse);
 			responseObserver.onCompleted();
 
-			log.info("[gRPC] createLink success: hashKey={}", serviceResponse.hashKey());
+			log.info("[gRPC] createLink success: shortCode={}", serviceResponse.shortCode());
 
 		} catch (Exception e) {
 			log.error("[gRPC] createLink error: {}", e.getMessage());
@@ -68,15 +68,15 @@ public class ShortUrlGrpcController extends UrlShortenerRpcGrpc.UrlShortenerRpcI
 	/**
 	 * 단축 URL 삭제
 	 *
-	 * @param request hashKey 포함
+	 * @param request shortCode 포함
 	 * @param responseObserver 응답 전송 객체
 	 */
 	@Override
 	public void deleteLink(DeleteLinkRequest request, StreamObserver<DeleteLinkResponse> responseObserver) {
 		try {
-			log.info("[gRPC] deleteLink: hashKey={}", request.getHashKey());
+			log.info("[gRPC] deleteLink: shortCode={}", request.getShortCode());
 
-			shortUrlService.deleteLink(request.getHashKey());
+			shortUrlService.deleteLink(request.getShortCode());
 
 			// 빈 응답 (성공)
 			DeleteLinkResponse grpcResponse = DeleteLinkResponse.newBuilder().build();

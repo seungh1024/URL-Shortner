@@ -1,5 +1,8 @@
 package com.shortener.url_shortener.domain.url.entity;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -15,7 +18,8 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "url_shortener", indexes = {
-	@Index(name = "idx_hash_key", columnList = "hash_key", unique = true),
+	@Index(name = "idx_hash_key", columnList = "hash_key"),
+	@Index(name = "idx_short_code", columnList = "short_code", unique = true),
 	@Index(name = "idx_expired_at_id", columnList = "expired_at, id")
 })
 @Getter
@@ -24,8 +28,11 @@ public class ShortUrl {
 	@Id
 	private Long id;
 
-	@Column(name = "hash_key", nullable = false, length = 8, unique = true)
-	private String hashKey;
+	@Column(name = "hash_key", nullable = false, columnDefinition = "BINARY(32)")
+	private byte[] hashKey;
+
+	@Column(name = "short_code", nullable = false, length = 8, unique = true)
+	private String shortCode;
 
 	@Column(name = "redirection_url", nullable = false, columnDefinition = "TEXT")
 	private String redirectionUrl;
@@ -51,11 +58,25 @@ public class ShortUrl {
 		this.updatedAt = LocalDateTime.now();
 	}
 
-	public ShortUrl(Long id, String hashKey, String redirectionUrl, LocalDateTime expiredAt) {
+	public ShortUrl(Long id, byte[] hashKey, String shortCode, String redirectionUrl, LocalDateTime expiredAt) {
 		this.id = id;
 		this.hashKey = hashKey;
+		this.shortCode = shortCode;
 		this.redirectionUrl = redirectionUrl;
 		this.expiredAt = expiredAt;
+	}
+
+	public ShortUrl(Long id, String shortCode, String redirectionUrl, LocalDateTime expiredAt) {
+		this(id, sha256(redirectionUrl), shortCode, redirectionUrl, expiredAt);
+	}
+
+	private static byte[] sha256(String input) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			return digest.digest(input.getBytes(StandardCharsets.UTF_8));
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("SHA-256 not available", e);
+		}
 	}
 
 	public void updateRedirectUrl(String redirectURL) {

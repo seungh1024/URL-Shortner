@@ -2,15 +2,18 @@ package com.shortener.url_shortener.domain.url.service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.shortener.url_shortener.domain.url.dto.response.LinkCreateResponse;
+import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.ShortUrl;
 import com.shortener.url_shortener.domain.url.repository.ShortUrlJpaRepository;
+import com.shortener.url_shortener.domain.url.repository.ShortUrlLockRepository;
 import com.shortener.url_shortener.global.error.ErrorCode;
 import com.shortener.url_shortener.global.util.Base62Encoder;
 import com.shortener.url_shortener.global.util.HashGenerator;
@@ -28,6 +31,7 @@ public class ShortUrlService {
 
 	private final TsidGenerator tsidGenerator;
 	private final ShortUrlJpaRepository shortUrlJpaRepository;
+	private final ShortUrlLockRepository shortUrlLockRepository;
 	private final Base62Encoder base62Encoder;
 	private final HashGenerator hashGenerator;
 
@@ -43,12 +47,18 @@ public class ShortUrlService {
 	@Value("${constant.hash.conflict.retry}")
 	private int retry;
 
-	private static final SecureRandom secureRandom = new SecureRandom();
+	@Value("${constant.url.max-length:2048}")
+	private int maxUrlLength;
+
+	@Value("${constant.hash.lock-timeout-seconds:3}")
+	private int lockTimeoutSeconds;
+
+	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
 	@Transactional
 	public String getLink(String key) {
-		validateHashKey(key);
-		ShortUrl shortUrl = shortUrlJpaRepository.findByHashKey(key)
+		validateShortCode(key);
+		ShortUrl shortUrl = shortUrlJpaRepository.findByShortCode(key)
 			.orElseThrow(() -> ErrorCode.KEY_NOT_FOUND.baseException(
 				ShortenerStringUtil.format("Get link failed. key: {}", key)
 			));
@@ -63,47 +73,63 @@ public class ShortUrlService {
 	}
 
 	@Transactional
-	public LinkCreateResponse createLink(String redirectURL) {
-		Long id = tsidGenerator.nextKey();
-		byte[] hash = hashGenerator.hash(id, redirectURL); // 동일 URL에서의 재발급을 위해 id를 더해줌
-		String encodedHash = base62Encoder.encode(hash);
+	public ShortUrlCreateResponse createLink(String redirectURL) {
+		validateRedirectUrl(redirectURL);
+		byte[] hashKey = hashGenerator.hash(redirectURL);
+		String lockName = createLockName(hashKey);
+		boolean locked = false;
 
-		int offset = encodedHash.length();
-		long triedOffset = 0;
-
-		for (int i = 0; i < retry; i++) {
-			// DB 저장 전 취소 확인(timeout 등)
-			if (Context.current().isCancelled()) {
-				log.warn("Request cancelled, stopping processing");
-				throw ErrorCode.REQUEST_CANCELLED.baseException(
-					"Request was cancelled by client"
+		try {
+			locked = shortUrlLockRepository.acquireLock(lockName, lockTimeoutSeconds);
+			if (!locked) {
+				throw ErrorCode.URL_GENERATION_FAILED.baseException(
+					ShortenerStringUtil.format("Failed to acquire lock. lockName: {}", lockName)
 				);
 			}
-			do {
-				offset = secureRandom.nextInt(encodedHash.length() - hashKeySize + 1);
-			} while (isOffsetAlreadyTried(triedOffset, offset));  // 명확한 의미
-			triedOffset |= (1L << offset);
+			LocalDateTime now = LocalDateTime.now();
 
-			String hashKey = encodedHash.substring(offset, offset + hashKeySize);
-			if (trySaveHashKey(id, hashKey, redirectURL)) {
-				return new LinkCreateResponse(hashKey, toShortUrl(hashKey));
+			List<ShortUrl> existing = shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(hashKey, now);
+			for (ShortUrl candidate : existing) {
+				if (candidate.getRedirectionUrl().equals(redirectURL)) {
+					return new ShortUrlCreateResponse(candidate.getShortCode(), toShortUrl(candidate.getShortCode()));
+				}
+			}
+
+			Long id = tsidGenerator.nextKey();
+			for (int i = 0; i < retry; i++) {
+				// DB 저장 전 취소 확인(timeout 등)
+				if (Context.current().isCancelled()) {
+					log.warn("Request cancelled, stopping processing");
+					throw ErrorCode.REQUEST_CANCELLED.baseException(
+						"Request was cancelled by client"
+					);
+				}
+
+				String shortCode = base62Encoder.random(hashKeySize, SECURE_RANDOM);
+				if (trySaveShortCode(id, hashKey, shortCode, redirectURL)) {
+					return new ShortUrlCreateResponse(shortCode, toShortUrl(shortCode));
+				}
+			}
+
+			throw ErrorCode.URL_GENERATION_FAILED.baseException(
+				ShortenerStringUtil.format("Failed to generate URL. short_code conflicted. redirectURL: {}", redirectURL)
+			);
+		} finally {
+			if (locked) {
+				shortUrlLockRepository.releaseLock(lockName);
 			}
 		}
-
-		throw ErrorCode.URL_GENERATION_FAILED.baseException(
-			ShortenerStringUtil.format("Failed to generate URL. hash conflicted. redirectURL: {}", redirectURL)
-		);
 	}
 
 	@Transactional
 	public void deleteLink(String key) {
-		validateHashKey(key);
-		shortUrlJpaRepository.deleteByHashKey(key);
+		validateShortCode(key);
+		shortUrlJpaRepository.deleteByShortCode(key);
 	}
 
-	private boolean trySaveHashKey(Long id, String hashKey, String redirectURL) {
+	private boolean trySaveShortCode(Long id, byte[] hashKey, String shortCode, String redirectURL) {
 		try {
-			ShortUrl shortUrl = new ShortUrl(id, hashKey, redirectURL,
+			ShortUrl shortUrl = new ShortUrl(id, hashKey, shortCode, redirectURL,
 				LocalDateTime.now().plusDays(defaultExpirationDays));
 
 			shortUrlJpaRepository.save(shortUrl);
@@ -125,7 +151,7 @@ public class ShortUrlService {
 		return sb.toString();
 	}
 
-	private void validateHashKey(String key) {
+	private void validateShortCode(String key) {
 		if (!base62Encoder.isValid(key)) {
 			throw ErrorCode.INVALID_KEY_ERROR.baseException(
 				ShortenerStringUtil.format("Invalid parameter from getLink. key: {}", key)
@@ -133,8 +159,42 @@ public class ShortUrlService {
 		}
 	}
 
-	private boolean isOffsetAlreadyTried(long triedOffset, int offset) {
-		return (triedOffset & (1L << offset)) != 0;
+	private void validateRedirectUrl(String redirectURL) {
+		if (redirectURL == null || redirectURL.isBlank()) {
+			throw ErrorCode.INVALID_ARGUMENT_ERROR.baseException(
+				ShortenerStringUtil.format("Invalid redirect URL. url: {}", redirectURL)
+			);
+		}
+		if (redirectURL.length() > maxUrlLength) {
+			throw ErrorCode.INVALID_ARGUMENT_ERROR.baseException(
+				ShortenerStringUtil.format("Redirect URL too long. length: {}", redirectURL.length())
+			);
+		}
+
+		try {
+			java.net.URI uri = new java.net.URI(redirectURL);
+			String scheme = uri.getScheme();
+			if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+				throw ErrorCode.INVALID_ARGUMENT_ERROR.baseException(
+					ShortenerStringUtil.format("Invalid redirect URL scheme. url: {}", redirectURL)
+				);
+			}
+			String host = uri.getHost();
+			if (host == null || host.isBlank()) {
+				throw ErrorCode.INVALID_ARGUMENT_ERROR.baseException(
+					ShortenerStringUtil.format("Invalid redirect URL host. url: {}", redirectURL)
+				);
+			}
+		} catch (java.net.URISyntaxException e) {
+			throw ErrorCode.INVALID_ARGUMENT_ERROR.baseException(
+				ShortenerStringUtil.format("Invalid redirect URL. url: {}", redirectURL)
+			);
+		}
+	}
+
+	private String createLockName(byte[] hashKey) {
+		String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(hashKey);
+		return "url:" + encoded;
 	}
 
 }
