@@ -217,6 +217,26 @@ class ShortUrlServiceTest {
 		}
 
 		@Test
+		@DisplayName("실패: URL이 null이면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_nullUrl() {
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(null));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
+		@DisplayName("실패: URL이 빈 문자열이면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_blankUrl() {
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink("  "));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
 		@DisplayName("실패: 지원하지 않는 스킴이면 INVALID_ARGUMENT_ERROR 예외")
 		void createLink_invalidScheme() {
 			// given
@@ -240,6 +260,35 @@ class ShortUrlServiceTest {
 				() -> shortUrlService.createLink(redirectUrl));
 
 			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
+		@DisplayName("실패: URL 형식 오류면 INVALID_ARGUMENT_ERROR 예외")
+		void createLink_invalidUriSyntax() {
+			// given
+			String redirectUrl = "http://exa mple.com";
+
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(redirectUrl));
+
+			assertEquals(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage(), exception.getMessage());
+		}
+
+		@Test
+		@DisplayName("실패: 락 획득 실패 시 URL_GENERATION_FAILED 예외")
+		void createLink_lockAcquireFail() {
+			// given
+			String redirectUrl = "https://example.com";
+			byte[] hash = new byte[]{1, 2, 3, 4};
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(shortUrlLockRepository.acquireLock(anyString(), anyInt())).thenReturn(false);
+
+			// when & then
+			CustomException exception = assertThrows(CustomException.class,
+				() -> shortUrlService.createLink(redirectUrl));
+
+			assertEquals(ErrorCode.URL_GENERATION_FAILED.getMessage(), exception.getMessage());
 		}
 
 		@Test
