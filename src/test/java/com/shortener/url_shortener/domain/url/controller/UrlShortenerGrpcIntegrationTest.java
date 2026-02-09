@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - 전체 흐름 검증
  */
 @DisplayName("UrlShortenerGrpc 통합 테스트")
+@TestPropertySource(properties = "grpc.server.enabled=true")
 class UrlShortenerGrpcIntegrationTest extends IntegrationTestBase {
 
 	@GrpcClient("url-shortener")

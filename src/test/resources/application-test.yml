@@ -4,6 +4,7 @@ server:
 
 grpc:
   server:
+    enabled: false
     address: 0.0.0.0
     api-key: ${GRPC_API_KEY:test-api-key}
     in-process-name: test
@@ -13,6 +14,9 @@ grpc:
       negotiationType: PLAINTEXT
 
 spring:
+  task:
+    scheduling:
+      enabled: false
   jpa:
     hibernate:
       ddl-auto: update
