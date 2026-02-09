@@ -38,3 +38,8 @@ scheduler:
   expired-url-deletion:
     cron: "0 0 3 * * *"
     batch-size: 10
+
+logging:
+  level:
+    com.shortener.url_shortener.domain.url.repository.ShortUrlLockRepository: DEBUG
+    com.shortener.url_shortener.domain.url.service.ShortUrlService: DEBUG
