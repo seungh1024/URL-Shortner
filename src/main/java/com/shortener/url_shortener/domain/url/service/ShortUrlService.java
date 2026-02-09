@@ -90,9 +90,11 @@ public class ShortUrlService {
 				);
 			}
 			if (TransactionSynchronizationManager.isSynchronizationActive()) {
+				log.debug("Registering lock release afterCompletion. lockName={}", lockName);
 				TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 					@Override
 					public void afterCompletion(int status) {
+						log.debug("afterCompletion release. lockName={}, status={}", lockName, status);
 						shortUrlLockRepository.releaseLock(lockName);
 					}
 				});
