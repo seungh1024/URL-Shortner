@@ -4,13 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * 통합 테스트 베이스 클래스
@@ -22,21 +19,31 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class IntegrationTestBase {
 
-	@Container
-	static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
-		.withDatabaseName("url_shortener_test")
-		.withUsername("test")
-		.withPassword("test");
+	private static final MySQLContainer<?> MYSQL_CONTAINER;
+
+	static {
+		MYSQL_CONTAINER = new MySQLContainer<>("mysql:8.0")
+			.withDatabaseName("url_shortener_test")
+			.withUsername("test")
+			.withPassword("test")
+			.withReuse(true);
+		MYSQL_CONTAINER.start();
+
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			if (MYSQL_CONTAINER != null) {
+				MYSQL_CONTAINER.stop();
+			}
+		}));
+	}
 
 	@DynamicPropertySource
 	static void setProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.datasource.url", mysql::getJdbcUrl);
-		registry.add("spring.datasource.username", mysql::getUsername);
-		registry.add("spring.datasource.password", mysql::getPassword);
+		registry.add("spring.datasource.url", MYSQL_CONTAINER::getJdbcUrl);
+		registry.add("spring.datasource.username", MYSQL_CONTAINER::getUsername);
+		registry.add("spring.datasource.password", MYSQL_CONTAINER::getPassword);
+		registry.add("spring.datasource.driver-class-name", MYSQL_CONTAINER::getDriverClassName);
 	}
 
 	@Autowired

@@ -1,35 +1,38 @@
 package com.shortener.url_shortener.domain.url.controller;
 
+import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.service.ShortUrlService;
 import com.shortener.url_shortener.global.error.ErrorCode;
+import com.shortener.url_shortener.global.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * URLShortenerController 단위 테스트
- * 
- * 테스트 내용:
- * - GET /{key}: 리다이렉션 성공/실패 케이스
+ * ShortUrlController WebMvc 테스트
  */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("URLShortenerController 단위 테스트")
+@WebMvcTest(ShortUrlController.class)
+@Import(GlobalExceptionHandler.class)
+@DisplayName("ShortUrlController WebMvc 테스트")
 class ShortUrlControllerTest {
 
-	@InjectMocks
-	private ShortUrlController shortUrlController;
+	@Autowired
+	private MockMvc mockMvc;
 
-	@Mock
+	@MockitoBean
 	private ShortUrlService shortUrlService;
 
 	@Nested
@@ -38,118 +41,124 @@ class ShortUrlControllerTest {
 
 		@Test
 		@DisplayName("성공: 유효한 키로 리다이렉션")
-		void getLink_success() {
+		void getLink_success() throws Exception {
 			// given
-			String hashKey = "aB3Xy9Km";
+			String shortCode = "aB3Xy9Km";
 			String redirectUrl = "https://example.com/test";
+			when(shortUrlService.getLink(shortCode)).thenReturn(redirectUrl);
 
-			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
-
-			// when
-			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
-
-			// then
-			assertEquals(HttpStatus.FOUND, response.getStatusCode());
-			assertEquals(redirectUrl, response.getHeaders().getLocation().toString());
+			// when & then
+			mockMvc.perform(get("/link/{key}", shortCode))
+				.andExpect(status().isFound())
+				.andExpect(header().string("Location", redirectUrl));
 		}
 
 		@Test
-		@DisplayName("실패: 존재하지 않는 키 조회 시 예외 발생")
-		void getLink_keyNotFound() {
+		@DisplayName("실패: 존재하지 않는 키 조회 시 404")
+		void getLink_keyNotFound() throws Exception {
 			// given
-			String hashKey = "notExist";
-
-			when(shortUrlService.getLink(hashKey))
+			String shortCode = "notExist";
+			when(shortUrlService.getLink(shortCode))
 				.thenThrow(ErrorCode.KEY_NOT_FOUND.baseException("Key not found"));
 
 			// when & then
-			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
+			mockMvc.perform(get("/link/{key}", shortCode))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.message").value(ErrorCode.KEY_NOT_FOUND.getMessage()));
 		}
 
 		@Test
-		@DisplayName("실패: 만료된 링크 조회 시 예외 발생")
-		void getLink_expiredLink() {
+		@DisplayName("실패: 잘못된 키 형식 시 400")
+		void getLink_invalidKey() throws Exception {
 			// given
-			String hashKey = "expired1";
-
-			when(shortUrlService.getLink(hashKey))
-				.thenThrow(ErrorCode.EXPIRED_LINK.baseException("Link expired"));
-
-			// when & then
-			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
-		}
-
-		@Test
-		@DisplayName("실패: 잘못된 키 형식 시 예외 발생")
-		void getLink_invalidKey() {
-			// given
-			String hashKey = "invalid@key!";
-
-			when(shortUrlService.getLink(hashKey))
+			String shortCode = "invalid@key!";
+			when(shortUrlService.getLink(shortCode))
 				.thenThrow(ErrorCode.INVALID_KEY_ERROR.baseException("Invalid key format"));
 
 			// when & then
-			assertThrows(Exception.class, () -> shortUrlController.getLink(hashKey));
+			mockMvc.perform(get("/link/{key}", shortCode))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(ErrorCode.INVALID_KEY_ERROR.getMessage()));
 		}
+	}
+
+	@Nested
+	@DisplayName("POST /link - 생성 테스트")
+	class CreateLinkTest {
 
 		@Test
-		@DisplayName("성공: Base62 문자만 포함된 키 허용")
-		void getLink_validBase62Key() {
+		@DisplayName("성공: 단축 URL 생성")
+		void createLink_success() throws Exception {
 			// given
-			String hashKey = "aB3Xy9Km"; // 0-9, a-z, A-Z
 			String redirectUrl = "https://example.com";
+			String shortCode = "aB3Xy9Km";
+			String shortUrl = "http://localhost:8080/" + shortCode;
+			String requestBody = """
+				{"redirectUrl":"%s"}
+				""".formatted(redirectUrl);
 
-			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
+			when(shortUrlService.createLink(redirectUrl))
+				.thenReturn(new ShortUrlCreateResponse(shortCode, shortUrl));
 
-			// when
-			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
-
-			// then
-			assertEquals(HttpStatus.FOUND, response.getStatusCode());
-			assertEquals(redirectUrl, response.getHeaders().getLocation().toString());
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.shortCode").value(shortCode))
+				.andExpect(jsonPath("$.url").value(shortUrl));
 		}
 
 		@Test
-		@DisplayName("성공: 다양한 URL 형식 리다이렉션")
-		void getLink_variousUrlFormats() {
+		@DisplayName("실패: redirectUrl 누락 시 400")
+		void createLink_missingRedirectUrl_badRequest() throws Exception {
 			// given
-			String hashKey = "test1234";
-			String[] urls = {
-				"https://example.com",
-				"https://example.com/path",
-				"https://example.com/path?query=value",
-				"https://example.com/path#anchor",
-				"https://sub.example.com:8080/path?q=1#top"
-			};
+			String requestBody = """
+				{"redirectUrl":""}
+				""";
 
-			for (String url : urls) {
-				when(shortUrlService.getLink(hashKey)).thenReturn(url);
-
-				// when
-				ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
-
-				// then
-				assertEquals(HttpStatus.FOUND, response.getStatusCode());
-				assertEquals(url, response.getHeaders().getLocation().toString());
-			}
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage()));
 		}
 
 		@Test
-		@DisplayName("성공: Location 헤더가 올바르게 설정됨")
-		void getLink_locationHeaderSetCorrectly() {
+		@DisplayName("실패: 잘못된 URL 스킴이면 400")
+		void createLink_invalidScheme_badRequest() throws Exception {
 			// given
-			String hashKey = "testKey";
-			String redirectUrl = "https://example.com";
+			String requestBody = """
+				{"redirectUrl":"ftp://example.com"}
+				""";
+			when(shortUrlService.createLink("ftp://example.com"))
+				.thenThrow(ErrorCode.INVALID_ARGUMENT_ERROR.baseException("Invalid scheme"));
 
-			when(shortUrlService.getLink(hashKey)).thenReturn(redirectUrl);
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage()));
+		}
 
-			// when
-			ResponseEntity<Void> response = shortUrlController.getLink(hashKey);
+		@Test
+		@DisplayName("실패: URL 길이가 제한을 초과하면 400")
+		void createLink_exceedsMaxLength_badRequest() throws Exception {
+			// given
+			String longPath = "a".repeat(2100);
+			String redirectUrl = "http://example.com/" + longPath;
+			String requestBody = """
+				{"redirectUrl":"%s"}
+				""".formatted(redirectUrl);
 
-			// then
-			HttpHeaders headers = response.getHeaders();
-			assertNotNull(headers.getLocation());
-			assertEquals(redirectUrl, headers.getLocation().toString());
+			// when & then
+			mockMvc.perform(post("/link")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(requestBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(ErrorCode.INVALID_ARGUMENT_ERROR.getMessage()));
 		}
 	}
 }

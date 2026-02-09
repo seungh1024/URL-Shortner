@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -294,6 +295,32 @@ class Base62EncoderTest {
 			assertFalse(encoded.contains("&"));
 			assertFalse(encoded.contains("#"));
 			assertFalse(encoded.contains(" "));
+		}
+	}
+
+	@Nested
+	@DisplayName("랜덤 문자열 생성 테스트")
+	class RandomTest {
+
+		@Test
+		@DisplayName("길이가 0 이하이면 빈 문자열 반환")
+		void random_nonPositiveLength_returnsEmpty() {
+			SecureRandom random = new SecureRandom();
+
+			assertEquals("", encoder.random(0, random));
+			assertEquals("", encoder.random(-1, random));
+		}
+
+		@Test
+		@DisplayName("정해진 길이의 Base62 문자열 생성")
+		void random_generatesBase62String() {
+			SecureRandom random = new SecureRandom();
+
+			String result = encoder.random(8, random);
+
+			assertNotNull(result);
+			assertEquals(8, result.length());
+			assertTrue(encoder.isValid(result));
 		}
 	}
 }

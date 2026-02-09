@@ -3,6 +3,7 @@ package com.shortener.url_shortener.global.util;
 import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
+import java.security.SecureRandom;
 
 
 @Component
@@ -68,10 +69,6 @@ public class Base62Encoder {
         return num.toByteArray();
     }
 
-    public String decodeString(String input) {
-        return new String(decode(input));
-    }
-
     /**
      * Base62 문자열이 유효한지 검증
      * 
@@ -113,6 +110,24 @@ public class Base62Encoder {
         }
 
         return encoded.toString();
+    }
+
+    /**
+     * Base62 랜덤 문자열 생성
+     *
+     * @param length 생성할 길이
+     * @param random 사용할 난수 생성기
+     * @return Base62 랜덤 문자열
+     */
+    public String random(int length, SecureRandom random) {
+        if (length <= 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(BASE62_CHARS.charAt(random.nextInt(BASE)));
+        }
+        return sb.toString();
     }
 
 }

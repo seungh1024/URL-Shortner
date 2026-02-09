@@ -4,6 +4,7 @@ server:
 
 grpc:
   server:
+    enabled: false
     address: 0.0.0.0
     api-key: ${GRPC_API_KEY:test-api-key}
     in-process-name: test
@@ -13,6 +14,9 @@ grpc:
       negotiationType: PLAINTEXT
 
 spring:
+  task:
+    scheduling:
+      enabled: false
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,6 +27,8 @@ spring:
 
 constant:
   default-expiration-days: 7
+  url:
+    max-length: 2048
   hash:
     length: 8
     conflict:
@@ -32,3 +38,8 @@ scheduler:
   expired-url-deletion:
     cron: "0 0 3 * * *"
     batch-size: 10
+
+logging:
+  level:
+    com.shortener.url_shortener.domain.url.repository.ShortUrlLockRepository: DEBUG
+    com.shortener.url_shortener.domain.url.service.ShortUrlService: DEBUG
