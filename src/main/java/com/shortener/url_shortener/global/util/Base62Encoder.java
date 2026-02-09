@@ -69,10 +69,6 @@ public class Base62Encoder {
         return num.toByteArray();
     }
 
-    public String decodeString(String input) {
-        return new String(decode(input));
-    }
-
     /**
      * Base62 문자열이 유효한지 검증
      * 

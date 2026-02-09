@@ -79,10 +79,6 @@ public class ShortUrl {
 		}
 	}
 
-	public void updateRedirectUrl(String redirectURL) {
-		this.redirectionUrl = redirectURL;
-	}
-
 	public boolean isExpired() {
 		return LocalDateTime.now().isAfter(this.expiredAt);
 	}
