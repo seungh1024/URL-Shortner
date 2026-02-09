@@ -306,8 +306,8 @@ class ShortUrlServiceTest {
 		}
 
 		@Test
-		@DisplayName("성공: Base62 인코딩 결과에서 8글자 부분 문자열 추출")
-		void createLink_extractsCorrectLength() {
+		@DisplayName("성공: 랜덤 shortCode 길이 8 생성")
+		void createLink_generatesShortCodeWithLength() {
 			// given
 			String redirectUrl = "https://example.com";
 			Long tsid = 123456789L;

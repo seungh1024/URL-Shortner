@@ -1,8 +1,5 @@
 package com.shortener.url_shortener.domain.url.controller;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -227,16 +224,7 @@ class ShortUrlControllerIntegrationTest extends IntegrationTestBase {
 	}
 
 	private ShortUrl newShortUrl(Long id, String shortCode, String redirectUrl, LocalDateTime expiredAt) {
-		return new ShortUrl(id, sha256(redirectUrl), shortCode, redirectUrl, expiredAt);
-	}
-
-	private byte[] sha256(String input) {
-		try {
-			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			return digest.digest(input.getBytes(StandardCharsets.UTF_8));
-		} catch (NoSuchAlgorithmException e) {
-			throw new IllegalStateException("SHA-256 not available", e);
-		}
+		return new ShortUrl(id, shortCode, redirectUrl, expiredAt);
 	}
 
 }
