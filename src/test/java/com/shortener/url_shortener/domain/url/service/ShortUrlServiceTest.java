@@ -20,6 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -327,6 +329,36 @@ class ShortUrlServiceTest {
 			// then
 			assertEquals(8, response.shortCode().length());
 			assertEquals(shortCode, response.shortCode());
+		}
+
+		@Test
+		@DisplayName("락 해제는 트랜잭션 완료 이후 수행")
+		void createLink_releasesLockAfterCompletion() {
+			// given
+			String redirectUrl = "https://example.com";
+			byte[] hash = new byte[]{1, 2, 3, 4};
+			ShortUrl existing = new ShortUrl(1L, hash, "aB3Xy9Km", redirectUrl, LocalDateTime.now().plusDays(1));
+
+			when(hashGenerator.hash(redirectUrl)).thenReturn(hash);
+			when(shortUrlJpaRepository.findByHashKeyAndExpiredAtAfter(eq(hash), any(LocalDateTime.class)))
+				.thenReturn(List.of(existing));
+
+			TransactionSynchronizationManager.initSynchronization();
+			try {
+				// when
+				shortUrlService.createLink(redirectUrl);
+
+				// then: 트랜잭션 완료 전에는 락 해제하지 않음
+				verify(shortUrlLockRepository, never()).releaseLock(anyString());
+
+				var synchronizations = TransactionSynchronizationManager.getSynchronizations();
+				assertEquals(1, synchronizations.size());
+
+				synchronizations.get(0).afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+				verify(shortUrlLockRepository).releaseLock(anyString());
+			} finally {
+				TransactionSynchronizationManager.clearSynchronization();
+			}
 		}
 	}
 
