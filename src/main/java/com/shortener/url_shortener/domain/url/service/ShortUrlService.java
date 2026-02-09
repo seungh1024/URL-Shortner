@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.shortener.url_shortener.domain.url.dto.response.ShortUrlCreateResponse;
 import com.shortener.url_shortener.domain.url.entity.ShortUrl;
@@ -78,6 +80,7 @@ public class ShortUrlService {
 		byte[] hashKey = hashGenerator.hash(redirectURL);
 		String lockName = createLockName(hashKey);
 		boolean locked = false;
+		boolean releaseInFinally = true;
 
 		try {
 			locked = shortUrlLockRepository.acquireLock(lockName, lockTimeoutSeconds);
@@ -85,6 +88,15 @@ public class ShortUrlService {
 				throw ErrorCode.URL_GENERATION_FAILED.baseException(
 					ShortenerStringUtil.format("Failed to acquire lock. lockName: {}", lockName)
 				);
+			}
+			if (TransactionSynchronizationManager.isSynchronizationActive()) {
+				TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+					@Override
+					public void afterCompletion(int status) {
+						shortUrlLockRepository.releaseLock(lockName);
+					}
+				});
+				releaseInFinally = false;
 			}
 			LocalDateTime now = LocalDateTime.now();
 
@@ -115,7 +127,7 @@ public class ShortUrlService {
 				ShortenerStringUtil.format("Failed to generate URL. short_code conflicted. redirectURL: {}", redirectURL)
 			);
 		} finally {
-			if (locked) {
+			if (locked && releaseInFinally) {
 				shortUrlLockRepository.releaseLock(lockName);
 			}
 		}
